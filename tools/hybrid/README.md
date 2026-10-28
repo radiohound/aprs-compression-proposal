@@ -137,3 +137,87 @@ so a station of yours in buckets 0 to 2 stays out of training. `--base-counts` a
 Weighting a region helps that region by about 0.5 to 3.5 points at the same table size and costs the rest by about 0.7 to 1.5 points, because the table
 has the same size, so something else gives. A weight near 1 for a large, varied capture of his is a more careful starting point than a large boost.
 It improves compression of the PPM text for every layout; it does not change the difference between whole packet and hybrid, which comes from the native fields.
+
+## Four ideas to save more bytes in hybrid B
+
+These are measured on hybrid B with moricef's real native costs (`NATIVE=1`, from his PR #1), full frames (N=1, and N=2 below), no RXT. Each is off by
+default, so the older results do not change. Native draft-0 spec: `docs/LORA_APRS_NATIVE_FRAME_DRAFT0.md` in `moricef/LoRa_APRS_iGate`, branch `rxt`.
+
+| Switch | What it does |
+|---|---|
+| `TOCALL=1` | Destination: the 192 most frequent destinations of the training stations cost 1 byte; a registry pattern with exactly one wildcard (`APLRG?`, from `aprsorg/aprs-deviceid` `tocalls.yaml`, commit c50d026c of 19 October 2026, **limited to `APL…` entries**, because most registry entries are VHF radios and software a LoRa device never sends) costs 2 bytes; a Mic-E packet 4 bytes (an estimate); anything else an escape byte plus the native element. `TOCALLFILE` is built by `tocall_table.py` from the training stations only. |
+| `POSNATIVE=1`, `PACKPOS=1` | Position packets (`!` `=` `/` `@`, not Mic-E, no ambiguity) go in the draft-0 position block and PPM codes only the comment. `PACKPOS` replaces latitude, longitude, direction (5 degrees) and speed (to 255 kn) with one integer of 7 bytes (6 without course/speed): `v = ((lat_idx * 2160000 + lon_idx) * 73 + dir_idx) * 256 + speed`. The flags byte, symbol (2), altitude (4) and timestamp (3) stay as in draft 0; a compressed position also keeps its T byte. |
+| `WSPRCALL=1` | Source and relay callsigns as one 32-bit number (base 37·36·10·27³, times 16 plus a numeric SSID 0 to 15), 4 bytes instead of 5. A 4-byte number cannot carry the used mark `*`; `WSPRSTAR=1` adds one byte for a path that has one (an assumption, not a design). |
+| `PLAINTEXT=1` | Text PPM cannot shrink goes in the native frame as it is, without the `:` lead byte the first harness charged (hybrid B only; about 0.2 points). An empty comment after a position block sends no text. |
+| `HOPCALL=C` | Callsign of the simulated relay. These runs use `KD6DGI-10`, a callsign that packs; the default `DIGI-10` does not. |
+
+With `NATIVE=1` a row the native encoder cannot carry is sent as a plain frame (3 + text length) in every layout, so all layouts cover the same packets (none in our data).
+`DUMPTEXT=1` prints the text hybrid B hands to PPM, which `train_layout_model.py --texts` trains on. `SELFTEST=1` decodes one packed position.
+
+**Setup.** Our held-out stations (93,145 packets, 1,669 stations), N=1 and N=2, direct reception, SF12 and SF7 airtime, split by stationary, moving and
+relayed (the WIDE1-1 subset after one simulated relay hop). Whole packet and hybrid A use the committed tables; hybrid B uses a table trained on the training stations'
+B text (77 KB), and the position variants a table trained on their comment-only text (75 KB): `DUMPTEXT=1 ... hl train.tsv > texts.txt`, then
+`train_layout_model.py --texts texts.txt --mode info --min-count 16 --max-kb 79 --version 2`. Percentages are bytes saved against the plain frame (3-byte prefix, no RXT),
+average frame bytes in brackets. Decode failures: 0 in every run.
+
+
+### N=1, bytes saved against the plain frame (avg frame bytes in brackets), direct reception; SF12 / SF7 airtime saved
+
+| Variant | All packets | SF12 | SF7 | Stationary | Moving | After one relay hop (WIDE1-1 subset) | Decode failures |
+|---|---|---|---|---|---|---|---|
+| Whole-packet PPM | 45.8% (44.1) | 36.1% | 37.6% | 47.2% (42.6) | 38.8% (34.3) | 25.8% (46.9) | 0 |
+| Hybrid A | 42.1% (47.1) | 33.2% | 34.6% | 42.0% (46.9) | 36.1% (35.8) | 34.5% (41.4) | 0 |
+| Hybrid B, NATIVE=1 (old text rule) | 38.5% (50.0) | 30.6% | 31.4% | 37.9% (50.1) | 33.3% (37.4) | 31.1% (43.6) | 0 |
+| Hybrid B, NATIVE=1 (baseline) | 38.7% (49.8) | 30.7% | 32.0% | 38.0% (50.1) | 34.3% (36.8) | 31.8% (43.1) | 0 |
+| B + tocall table | 43.6% (45.8) | 34.7% | 35.9% | 42.9% (46.2) | 41.4% (32.8) | 38.1% (39.1) | 0 |
+| B + WSPR callsigns | 40.0% (48.8) | 31.5% | 32.9% | 39.2% (49.1) | 36.2% (35.7) | 34.9% (41.2) | 0 |
+| B + WSPR callsigns, +1 B for a used mark | 39.5% (49.2) | 31.1% | 32.5% | 38.4% (49.8) | 35.9% (35.9) | 33.3% (42.2) | 0 |
+| B + tocall + WSPR | 44.9% (44.8) | 35.5% | 36.8% | 44.1% (45.2) | 43.4% (31.7) | 41.2% (37.2) | 0 |
+| B + native position (draft 0) | 41.3% (47.7) | 32.6% | 33.9% | 40.7% (47.9) | 36.9% (35.4) | 34.5% (41.4) | 0 |
+| B + packed position | 42.3% (46.9) | 33.2% | 34.6% | 41.7% (47.1) | 38.9% (34.2) | 36.2% (40.3) | 0 |
+| B + all three | 48.5% (41.9) | 38.1% | 39.9% | 47.8% (42.2) | 48.0% (29.1) | 45.7% (34.4) | 0 |
+| B + all three, WSPR with used-mark byte | 47.9% (42.3) | 37.6% | 39.5% | 46.9% (42.9) | 47.7% (29.3) | 44.1% (35.4) | 0 |
+
+### N=2, bytes saved against the plain frame (avg frame bytes in brackets), direct reception; SF12 / SF7 airtime saved
+
+| Variant | All packets | SF12 | SF7 | Stationary | Moving | After one relay hop (WIDE1-1 subset) | Decode failures |
+|---|---|---|---|---|---|---|---|
+| Whole-packet PPM | 56.9% (35.1) | 44.7% | 46.7% | 62.2% (30.5) | 48.4% (28.9) | 45.1% (34.7) | 0 |
+| Hybrid A | 53.0% (38.2) | 41.7% | 43.5% | 56.8% (34.9) | 45.1% (30.7) | 46.0% (34.2) | 0 |
+| Hybrid B, NATIVE=1 (old text rule) | 46.3% (43.6) | 36.7% | 37.9% | 49.6% (40.7) | 37.5% (35.0) | 38.4% (39.0) | 0 |
+| Hybrid B, NATIVE=1 (baseline) | 46.5% (43.5) | 36.8% | 38.4% | 49.6% (40.7) | 38.4% (34.5) | 39.0% (38.6) | 0 |
+| B + tocall table | 51.4% (39.5) | 40.7% | 42.3% | 54.5% (36.8) | 45.6% (30.5) | 45.3% (34.6) | 0 |
+| B + WSPR callsigns | 47.8% (42.4) | 37.6% | 39.2% | 50.9% (39.7) | 40.4% (33.4) | 42.1% (36.6) | 0 |
+| B + WSPR callsigns, +1 B for a used mark | 47.2% (42.9) | 37.2% | 38.8% | 50.0% (40.4) | 40.1% (33.5) | 40.5% (37.6) | 0 |
+| B + tocall + WSPR | 52.7% (38.5) | 41.6% | 43.1% | 55.7% (35.8) | 47.5% (29.4) | 48.4% (32.6) | 0 |
+| B + native position (draft 0) | 45.4% (44.4) | 35.8% | 37.3% | 46.5% (43.3) | 39.8% (33.7) | 38.5% (38.9) | 0 |
+| B + packed position | 46.4% (43.6) | 36.4% | 38.0% | 47.5% (42.4) | 41.8% (32.6) | 40.2% (37.8) | 0 |
+| B + all three | 52.6% (38.6) | 41.3% | 43.3% | 53.6% (37.5) | 50.9% (27.5) | 49.6% (31.9) | 0 |
+| B + all three, WSPR with used-mark byte | 52.0% (39.0) | 40.8% | 42.8% | 52.7% (38.2) | 50.7% (27.6) | 48.1% (32.9) | 0 |
+
+**What the numbers say on our data.**
+* The big gain is the destination. With real native costs a destination costs 5 bytes, against 1 byte with a code table, so the tocall table is worth about 5 points at N=1.
+  Our test set only has `APL…` destinations (that is how `prep.py` finds LoRa devices), so 99.2% of packets hit the 1-byte table (9, 14 and 23 entries reach 90, 95 and
+  98% of the training packets); no packet is Mic-E and the registry patterns never fire. **That is not representative of a capture that keeps other destinations**
+  (`--dest-prefix ''`), where the share at each step will differ. The tocall result should be re-run on his data.
+* Packed position is worth about 1 point over the draft-0 position block at N=1, and the draft-0 block itself about 2.6 points over leaving the position in PPM.
+  83% of our packets carry a position natively; 87% of those are base-91 compressed, only 8% have course/speed.
+* WSPR callsigns are worth about 1 byte per packet (1.3 points at N=1): the source packs in 95.8% of packets, relay callsign elements in 70.5% (without `TCPIP*`).
+  With a byte for the used mark the gain is about 0.6 byte.
+* Whole packet after a relay hop is low at N=1 (25.8%) because the simulated relay's callsign is new to its PPM model, so PPM pays for every character; a relay seen in training would cost less. Treat the hop column as an illustration.
+* All three together put hybrid B 2.7 points ahead of whole-packet PPM at N=1 on our data and 4 points behind at N=2, where priming helps whole packet.
+
+**Lossy by design (packed position).** Rebuilding the text from the packed integer differs from the original for 87.7% of the packets that carry a position:
+65,964 of the 67,600 compressed ones (the 0.01 minute grid, about 9 m at worst, is coarser than base 91, which resolves about 0.3 m), and 2,199 whose course is not a multiple of 5.
+No speed exceeds 255 knots. Uncompressed positions are exact to the hundredth of a minute. The integer itself always decodes back (0 failures).
+
+**Not covered here.** Mic-E is only an estimate (4 bytes) and absent from our data. The relay hop uses one simulated relay. The runs use our APRS-IS capture, not
+moricef's captures, so his numbers may differ.
+
+Commands (private captures `CAPTURES`; `hl` is the harness built with the table named in each run):
+
+    prep.py test.tsv CAPTURES --test-buckets 3          # held-out stations (hash buckets 0 to 2)
+    prep.py train.tsv CAPTURES --train-from 3           # training stations (buckets 3 to 9)
+    tocall_table.py train.tsv tocalls.yaml tocall.txt   # 192 exact destinations + one-wildcard APL patterns
+    cc -std=c99 -O2 -Ireference tools/hybrid/hybrid_layouts.c reference/aprs_ppm.c TABLE.c -lm -o hl
+    HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tocall.txt LAYOUTS=4 PLAINTEXT=1 PACKPOS=1 TOCALL=1 WSPRCALL=1 ./hl test.tsv 1 2    # hybrid B, all three

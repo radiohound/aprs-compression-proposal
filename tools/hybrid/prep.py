@@ -8,6 +8,7 @@ q-construct on is dropped, as it is not sent over the air. Output row:
     src <TAB> rf(0/1) <TAB> kind(S/M/O) <TAB> path <TAB> text      text = SRC>DST[,PATH]:INFO
   rf    1 if the packet reached APRS-IS through qAR/qAO (heard over RF); --all-rf sets 1 for every row (use it for plain TNC2 logs)
   kind  S stationary, M moving, O other, from the spread of the station's decoded positions
+With --train-from N the other side of the split is written (buckets N..9, the training stations; the harness reads it only to build tables).
 Only stations whose callsign hash falls in buckets 0..(test-buckets-1) of 10 are written: the same split the model trainer
 (train_layout_model.py --holdout 0.3) keeps out of training, so test stations are never in a training set. Consecutive duplicate
 texts from one station are dropped. --dest-prefix '' accepts every destination (default APL = LoRa APRS devices)."""
@@ -21,6 +22,7 @@ bucket = lambda s: int(hashlib.md5(s).hexdigest(), 16) % 10
 ap = argparse.ArgumentParser()
 ap.add_argument("out"); ap.add_argument("files", nargs="+")
 ap.add_argument("--dest-prefix", default="APL"); ap.add_argument("--test-buckets", type=int, default=3); ap.add_argument("--all-rf", action="store_true")
+ap.add_argument("--train-from", type=int, default=0, help="write the training stations instead: callsign-hash buckets N..9 (3 matches --test-buckets 3)")
 a = ap.parse_args()
 prefix = a.dest_prefix.encode()
 seqs = collections.OrderedDict(); pos = collections.defaultdict(list)
@@ -31,7 +33,8 @@ for fn in a.files:
         m = LINE.match(line)
         if not m: continue
         src, dst, path_, info = m.groups()
-        if not dst.startswith(prefix) or bucket(src) >= a.test_buckets: continue
+        if not dst.startswith(prefix): continue
+        if (bucket(src) < a.train_from) if a.train_from else (bucket(src) >= a.test_buckets): continue
         keep, rf = [], 1 if a.all_rf else 0
         for p in path_.split(b",")[1:]:
             if p in (b"qAR", b"qAO"): rf = 1

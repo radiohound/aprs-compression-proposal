@@ -13,6 +13,7 @@ Merging with other data (a shared table from several networks):
   --base-counts FILE.gz   start from such a counts file (ours, published in tables/) and add your own packets on top
   --base-weight W         scale the base counts (1.0 = as published); your packets count 1 each, times --boost for matching stations
   --boost W --boost-re R  count packets from sources matching the regex R W times (for example a country's prefixes)
+  --texts FILE            train on ready-made texts, one per line (hybrid_layouts DUMPTEXT=1 writes the text hybrid B hands to PPM)
   --max-kb N              raise --min-count until the table is at most N KB and fits the 16-bit offsets
 Counts files hold only byte-context counts at or above --dump-min, no packet text.
 
@@ -71,6 +72,7 @@ def main():
     ap.add_argument("--version", type=int, default=1)
     ap.add_argument("--mode", default="whole", choices=("whole", "nopath", "info"))
     ap.add_argument("--dest-prefix", default="APL")
+    ap.add_argument("--texts", help="train on the texts in this file (one per line, for example from hybrid_layouts DUMPTEXT=1) instead of --lora/--vhf captures")
     ap.add_argument("--dump-counts")
     ap.add_argument("--dump-min", type=int, default=8)
     ap.add_argument("--base-counts")
@@ -86,6 +88,10 @@ def main():
     DEST_PREFIX = a.dest_prefix.encode()
 
     rows = {}
+    if a.texts:
+        for line in open(a.texts, "rb"):
+            line = line.rstrip(b"\n")
+            if line and len(line) <= 255: rows[line] = b""
     for f in a.lora: rows.update(load(f, False))
     for f in a.vhf: rows.update(load(f, True))
     cut = int(round(a.holdout * 10))
