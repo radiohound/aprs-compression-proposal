@@ -175,6 +175,7 @@ average frame bytes in brackets. Decode failures: 0 in every run.
 | B + tocall + WSPR | 44.9% (44.8) | 35.5% | 36.8% | 44.1% (45.2) | 43.4% (31.7) | 41.2% (37.2) | 0 |
 | B + native position (draft 0) | 41.3% (47.7) | 32.6% | 33.9% | 40.7% (47.9) | 36.9% (35.4) | 34.5% (41.4) | 0 |
 | B + packed position | 42.3% (46.9) | 33.2% | 34.6% | 41.7% (47.1) | 38.9% (34.2) | 36.2% (40.3) | 0 |
+| B + tocall + packed position (no WSPR) | 47.2% (42.9) | 37.2% | 38.6% | 46.5% (43.2) | 46.0% (30.2) | 42.6% (36.3) | 0 |
 | B + all three | 48.5% (41.9) | 38.1% | 39.9% | 47.8% (42.2) | 48.0% (29.1) | 45.7% (34.4) | 0 |
 | B + all three, WSPR with used-mark byte | 47.9% (42.3) | 37.6% | 39.5% | 46.9% (42.9) | 47.7% (29.3) | 44.1% (35.4) | 0 |
 
@@ -192,6 +193,7 @@ average frame bytes in brackets. Decode failures: 0 in every run.
 | B + tocall + WSPR | 52.7% (38.5) | 41.6% | 43.1% | 55.7% (35.8) | 47.5% (29.4) | 48.4% (32.6) | 0 |
 | B + native position (draft 0) | 45.4% (44.4) | 35.8% | 37.3% | 46.5% (43.3) | 39.8% (33.7) | 38.5% (38.9) | 0 |
 | B + packed position | 46.4% (43.6) | 36.4% | 38.0% | 47.5% (42.4) | 41.8% (32.6) | 40.2% (37.8) | 0 |
+| B + tocall + packed position (no WSPR) | 51.3% (39.6) | 40.4% | 41.9% | 52.3% (38.5) | 49.0% (28.6) | 46.5% (33.8) | 0 |
 | B + all three | 52.6% (38.6) | 41.3% | 43.3% | 53.6% (37.5) | 50.9% (27.5) | 49.6% (31.9) | 0 |
 | B + all three, WSPR with used-mark byte | 52.0% (39.0) | 40.8% | 42.8% | 52.7% (38.2) | 50.7% (27.6) | 48.1% (32.9) | 0 |
 
@@ -205,6 +207,8 @@ average frame bytes in brackets. Decode failures: 0 in every run.
 * WSPR callsigns are worth about 1 byte per packet (1.3 points at N=1): the source packs in 95.8% of packets, relay callsign elements in 70.5% (without `TCPIP*`).
   With a byte for the used mark the gain is about 0.6 byte.
 * Whole packet after a relay hop is low at N=1 (25.8%) because the simulated relay's callsign is new to its PPM model, so PPM pays for every character; a relay seen in training would cost less. Treat the hop column as an illustration.
+* Without WSPR, tocall plus packed position gives 47.2% at N=1 and 51.3% at N=2. The WSPR callsigns add 1.3 points at N=1 (0.7 with a byte for the used mark) and 1.3 at N=2 (0.7).
+  Tocall and the position block carry 47.2 of the 48.5 points, and neither changes how a callsign is written. WSPR is the only one of the three that needs a new callsign coding and has no place for the used mark.
 * All three together put hybrid B 2.7 points ahead of whole-packet PPM at N=1 on our data and 4 points behind at N=2, where priming helps whole packet.
 
 **Lossy by design (packed position).** Rebuilding the text from the packed integer differs from the original for 87.7% of the packets that carry a position:
