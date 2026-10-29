@@ -229,6 +229,6 @@ Commands (private captures `CAPTURES`; `hl` is the harness built with the table 
 
     prep.py test.tsv CAPTURES --test-buckets 3          # held-out stations (hash buckets 0 to 2)
     prep.py train.tsv CAPTURES --train-from 3           # training stations (buckets 3 to 9)
-    tocall_table.py train.tsv tocalls.yaml tocall.txt   # 192 exact destinations + one-wildcard APL patterns
+    tocall_table.py train.tsv tocalls.yaml tables/tocall_table.txt   # 192 exact destinations + one-wildcard APL patterns
     cc -std=c99 -O2 -Ireference tools/hybrid/hybrid_layouts.c reference/aprs_ppm.c TABLE.c -lm -o hl
-    HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tocall.txt LAYOUTS=4 PLAINTEXT=1 PACKPOS=1 TOCALL=1 WSPRCALL=1 ./hl test.tsv 1 2    # hybrid B, all three
+    HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tools/hybrid/tables/tocall_table.txt LAYOUTS=4 PLAINTEXT=1 PACKPOS=1 TOCALL=1 WSPRCALL=1 ./hl test.tsv 1 2    # hybrid B, all three

@@ -41,6 +41,7 @@ Trained on the training stations (callsign-hash buckets 3 to 9), the same split 
 (minimum counts 132 and 91) and no packet text; `tocall_table.txt` holds destination codes only. Rebuilding with the commands below gives byte-identical files.
 
     prep.py train.tsv CAPTURES --train-from 3
+    # tocalls.yaml: the APRS device registry, https://github.com/aprsorg/aprs-deviceid (we used commit c50d026c of 19 October 2026)
     tocall_table.py train.tsv tocalls.yaml tocall_table.txt
     cc -std=c99 -O2 -Ireference tools/hybrid/hybrid_layouts.c reference/aprs_ppm.c tools/hybrid/tables/model_hybridB_info.c -lm -o hl_dump
     HOPCALL=KD6DGI-10 NATIVE=1 PLAINTEXT=1 LAYOUTS=4 DUMPTEXT=1 ./hl_dump train.tsv > texts_info.txt
@@ -48,6 +49,6 @@ Trained on the training stations (callsign-hash buckets 3 to 9), the same split 
     train_layout_model.py --texts texts_info.txt    --mode info --min-count 16 --max-kb 79 --version 2 --out model_hybridB_info_native.c
     train_layout_model.py --texts texts_comment.txt --mode info --min-count 16 --max-kb 79 --version 2 --out model_hybridB_comment.c
 
-`--max-kb` raises the minimum count until the table fits. Use with `NATIVE=1 TOCALL=1 TOCALLFILE=tables/tocall_table.txt PACKPOS=1` (or `PACKPOS=2`) and
+`--max-kb` raises the minimum count until the table fits. Use with `NATIVE=1 TOCALL=1 TOCALLFILE=tools/hybrid/tables/tocall_table.txt PACKPOS=1` (or `PACKPOS=2`) and
 `LAYOUTS=4`; the comment table goes with `PACKPOS`, the other with a position left in the text. `tocall_table.txt` is built from our `APL...` data;
 a capture with other destinations should rebuild it (`--dest-prefix ''` in `prep.py`).
