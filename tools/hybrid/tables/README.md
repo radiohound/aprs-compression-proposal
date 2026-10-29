@@ -52,3 +52,27 @@ Trained on the training stations (callsign-hash buckets 3 to 9), the same split 
 `--max-kb` raises the minimum count until the table fits. Use with `NATIVE=1 TOCALL=1 TOCALLFILE=tools/hybrid/tables/tocall_table.txt PACKPOS=1` (or `PACKPOS=2`) and
 `LAYOUTS=4`; the comment table goes with `PACKPOS`, the other with a position left in the text. `tocall_table.txt` is built from our `APL...` data;
 a capture with other destinations should rebuild it (`--dest-prefix ''` in `prep.py`).
+
+## Destination table v2: the non-APL destinations moricef saw
+
+`tocall_table.txt` was built from `APL...` packets only. moricef's captures also carry destinations from other software and hardware (in Ariege about 12% of packets
+escaped, in the Arizona sample 0.2%), so `tocall_table_v2.txt` is v1 plus the destinations he reported (`extra_tocalls.txt`, with what the registry says about each):
+
+| Destination | Packets (Ariege) | What it is |
+|---|---:|---|
+| `APGRWO` | 500 | Graywolf software modem (registry `APGRW?`) |
+| `APFD11` | 420 | not in the registry |
+| `APDW16` | 39 | Dire Wolf (registry `APDW??`) |
+| `APFD12` | 30 | not in the registry |
+| `APMI06` | 4 (+4 in the Arizona recording) | Microsat WX3in1 Plus 2.0 weather station |
+| `APWL2K` | 3 (Arizona recording) | not in the registry; the name looks like Winlink 2000 |
+| `APU25N` | 1 (Arizona recording) | UI-View32 (registry `APU2*`) |
+| `BEACON` | 2 | a generic destination, not a device id |
+
+The 77 exact entries and 27 patterns of v1 keep their codes; the 8 new exact entries and the pattern `APGRW?` come after them.
+
+    tocall_table.py --base tables/tocall_table.txt --extra tables/extra_tocalls.txt --pattern-extra "APGRW?" tables/tocall_table_v2.txt
+
+On our packets with the destination of 12.2% of them swapped for these (a simulation, in the shares of his Ariege capture), hybrid B with tocall and packed position saves 46.4% with
+v1 (12.9% of packets escape) and 47.2% with v2 (0.7% escape): 0.6 bytes per packet, as expected from 989 packets that cost 6 bytes (escape and element) and now cost 1. It is not a
+measurement on his data. Mic-E destinations (2.5% in Ariege) are not in this table.

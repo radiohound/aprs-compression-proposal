@@ -1,0 +1,9 @@
+# destinations seen on moricef's LoRa captures that are not APL (Ariege, Arizona), 29 Oct 2026
+APGRWO   # Graywolf software modem (registry APGRW?)         500 packets in Ariege
+APFD11   # not in the registry                                420
+APDW16   # Dire Wolf (registry APDW??)                          39
+APFD12   # not in the registry                                 30
+APMI06   # Microsat WX3in1 Plus 2.0 weather station             4 (+4)
+APWL2K   # not in the registry (looks like Winlink 2000)        3
+APU25N   # UI-View32 (registry APU2*)                           1
+BEACON   # generic destination, not a device id                 2
