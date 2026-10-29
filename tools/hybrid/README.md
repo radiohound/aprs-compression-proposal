@@ -146,7 +146,7 @@ default, so the older results do not change. Native draft-0 spec: `docs/LORA_APR
 | Switch | What it does |
 |---|---|
 | `TOCALL=1` | Destination: the 192 most frequent destinations of the training stations cost 1 byte; a registry pattern with exactly one wildcard (`APLRG?`, from `aprsorg/aprs-deviceid` `tocalls.yaml`, commit c50d026c of 19 October 2026, **limited to `APL…` entries**, because most registry entries are VHF radios and software a LoRa device never sends) costs 2 bytes; a Mic-E packet 4 bytes (an estimate); anything else an escape byte plus the native element. `TOCALLFILE` is built by `tocall_table.py` from the training stations only. |
-| `POSNATIVE=1`, `PACKPOS=1` | Position packets (`!` `=` `/` `@`, not Mic-E, no ambiguity) go in the draft-0 position block and PPM codes only the comment. `PACKPOS` replaces latitude, longitude, direction (5 degrees) and speed (to 255 kn) with one integer of 7 bytes (6 without course/speed): `v = ((lat_idx * 2160000 + lon_idx) * 73 + dir_idx) * 256 + speed`. The flags byte, symbol (2), altitude (4) and timestamp (3) stay as in draft 0; a compressed position also keeps its T byte. |
+| `POSNATIVE=1`, `PACKPOS=1` | Position packets (`!` `=` `/` `@`, not Mic-E, no ambiguity) go in the draft-0 position block and PPM codes only the comment. `PACKPOS` replaces latitude, longitude, direction (5 degrees) and speed (to 255 kn) with one integer of 7 bytes (6 without course/speed): `v = ((lat_idx * 2160000 + lon_idx) * 73 + dir_idx) * 256 + speed`. The flags byte, symbol (2), altitude (4) and timestamp (3) stay as in draft 0; a compressed position also keeps its T byte. `PACKPOS=2` is the same with Mic-E's resolution: direction in 1 degree steps (0 unknown, 1 to 360) and speed 0 to 999 kn in 1 kn steps, 8 bytes (6 without course/speed), `v = ((lat_idx*2160000 + lon_idx)*361 + course)*1000 + speed`. |
 | `WSPRCALL=1` | Source and relay callsigns as one 32-bit number (base 37·36·10·27³, times 16 plus a numeric SSID 0 to 15), 4 bytes instead of 5. A 4-byte number cannot carry the used mark `*`; `WSPRSTAR=1` adds one byte for a path that has one (an assumption, not a design). |
 | `PLAINTEXT=1` | Text PPM cannot shrink goes in the native frame as it is, without the `:` lead byte the first harness charged (hybrid B only; about 0.2 points). An empty comment after a position block sends no text. |
 | `HOPCALL=C` | Callsign of the simulated relay. These runs use `KD6DGI-10`, a callsign that packs; the default `DIGI-10` does not. |
@@ -156,8 +156,8 @@ With `NATIVE=1` a row the native encoder cannot carry is sent as a plain frame (
 
 **Setup.** Our held-out stations (93,145 packets, 1,669 stations), N=1 and N=2, direct reception, SF12 and SF7 airtime, split by stationary, moving and
 relayed (the WIDE1-1 subset after one simulated relay hop). Whole packet and hybrid A use the committed tables; hybrid B uses a table trained on the training stations'
-B text (77 KB), and the position variants a table trained on their comment-only text (75 KB): `DUMPTEXT=1 ... hl train.tsv > texts.txt`, then
-`train_layout_model.py --texts texts.txt --mode info --min-count 16 --max-kb 79 --version 2`. Percentages are bytes saved against the plain frame (3-byte prefix, no RXT),
+B text (`tables/model_hybridB_info_native.c`, 77 KB), and the position variants a table trained on their comment-only text (`tables/model_hybridB_comment.c`, 75 KB).
+The destination list is `tables/tocall_table.txt`; the recipe is in `tables/README.md`. Percentages are bytes saved against the plain frame (3-byte prefix, no RXT),
 average frame bytes in brackets. Decode failures: 0 in every run.
 
 
@@ -176,6 +176,7 @@ average frame bytes in brackets. Decode failures: 0 in every run.
 | B + native position (draft 0) | 41.3% (47.7) | 32.6% | 33.9% | 40.7% (47.9) | 36.9% (35.4) | 34.5% (41.4) | 0 |
 | B + packed position | 42.3% (46.9) | 33.2% | 34.6% | 41.7% (47.1) | 38.9% (34.2) | 36.2% (40.3) | 0 |
 | B + tocall + packed position (no WSPR) | 47.2% (42.9) | 37.2% | 38.6% | 46.5% (43.2) | 46.0% (30.2) | 42.6% (36.3) | 0 |
+| B + tocall + packed position, 1 degree course, speed to 999 kn (PACKPOS=2) | 47.1% (43.0) | 37.1% | 38.5% | 46.5% (43.2) | 45.7% (30.4) | 42.4% (36.5) | 0 |
 | B + all three | 48.5% (41.9) | 38.1% | 39.9% | 47.8% (42.2) | 48.0% (29.1) | 45.7% (34.4) | 0 |
 | B + all three, WSPR with used-mark byte | 47.9% (42.3) | 37.6% | 39.5% | 46.9% (42.9) | 47.7% (29.3) | 44.1% (35.4) | 0 |
 
@@ -194,6 +195,7 @@ average frame bytes in brackets. Decode failures: 0 in every run.
 | B + native position (draft 0) | 45.4% (44.4) | 35.8% | 37.3% | 46.5% (43.3) | 39.8% (33.7) | 38.5% (38.9) | 0 |
 | B + packed position | 46.4% (43.6) | 36.4% | 38.0% | 47.5% (42.4) | 41.8% (32.6) | 40.2% (37.8) | 0 |
 | B + tocall + packed position (no WSPR) | 51.3% (39.6) | 40.4% | 41.9% | 52.3% (38.5) | 49.0% (28.6) | 46.5% (33.8) | 0 |
+| B + tocall + packed position, 1 degree course, speed to 999 kn (PACKPOS=2) | 51.2% (39.7) | 40.3% | 41.8% | 52.3% (38.5) | 48.6% (28.8) | 46.3% (34.0) | 0 |
 | B + all three | 52.6% (38.6) | 41.3% | 43.3% | 53.6% (37.5) | 50.9% (27.5) | 49.6% (31.9) | 0 |
 | B + all three, WSPR with used-mark byte | 52.0% (39.0) | 40.8% | 42.8% | 52.7% (38.2) | 50.7% (27.6) | 48.1% (32.9) | 0 |
 
@@ -204,6 +206,8 @@ average frame bytes in brackets. Decode failures: 0 in every run.
   (`--dest-prefix ''`), where the share at each step will differ. The tocall result should be re-run on his data.
 * Packed position is worth about 1 point over the draft-0 position block at N=1, and the draft-0 block itself about 2.6 points over leaving the position in PPM.
   83% of our packets carry a position natively; 87% of those are base-91 compressed, only 8% have course/speed.
+  The 8-byte `PACKPOS=2` (1 degree course, speed to 999 kn) costs 0.1 byte per packet more than the 7-byte `PACKPOS=1` (47.1% against 47.2% at N=1) because only 6.6% of packets carry course and speed.
+  Against the lossless draft-0 block it is about 0.9 points ahead at N=1 and N=2.
 * WSPR callsigns are worth about 1 byte per packet (1.3 points at N=1): the source packs in 95.8% of packets, relay callsign elements in 70.5% (without `TCPIP*`).
   With a byte for the used mark the gain is about 0.6 byte.
 * Whole packet after a relay hop is low at N=1 (25.8%) because the simulated relay's callsign is new to its PPM model, so PPM pays for every character; a relay seen in training would cost less. Treat the hop column as an illustration.
@@ -211,9 +215,12 @@ average frame bytes in brackets. Decode failures: 0 in every run.
   Tocall and the position block carry 47.2 of the 48.5 points, and neither changes how a callsign is written. WSPR is the only one of the three that needs a new callsign coding and has no place for the used mark.
 * All three together put hybrid B 2.7 points ahead of whole-packet PPM at N=1 on our data and 4 points behind at N=2, where priming helps whole packet.
 
-**Lossy by design (packed position).** Rebuilding the text from the packed integer differs from the original for 87.7% of the packets that carry a position:
-65,964 of the 67,600 compressed ones (the 0.01 minute grid, about 9 m at worst, is coarser than base 91, which resolves about 0.3 m), and 2,199 whose course is not a multiple of 5.
-No speed exceeds 255 knots. Uncompressed positions are exact to the hundredth of a minute. The integer itself always decodes back (0 failures).
+**What packed position changes.** Latitude and longitude go on the 0.01 minute grid, the grid Mic-E and uncompressed `DDMM.hhN` positions already use, so those rebuild
+as the identical text. Base-91 compressed positions resolve about 0.3 m, finer than a tracker's GPS; rounded to the grid they move by at most about 9 m (4 to 5 m on average),
+and their characters change. With `PACKPOS=2` that is all of the 84.9% of position packets whose rebuilt text differs from the original (65,964 of the 67,600 compressed ones; `PACKPOS=1` also changed course, 87.7%).
+With `PACKPOS=2` the course comes back exactly (`PACKPOS=1`, 5 degree steps, changed the course token of 2,771 of the 6,172 packets that carry one). The speed token changes for
+215 compressed packets: APRS compressed speed is a log scale (1.08^s - 1), so the rounded whole-knot value can land one step away. No speed exceeds 255 knots in our data.
+The integer itself always decodes back (0 failures). A position surveyed to centimetres would lose that precision.
 
 **Not covered here.** Mic-E is only an estimate (4 bytes) and absent from our data. The relay hop uses one simulated relay. The runs use our APRS-IS capture, not
 moricef's captures, so his numbers may differ.

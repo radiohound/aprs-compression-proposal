@@ -104,6 +104,7 @@ static int path_block_native(const char *p) {
    POSNATIVE=1  position packets go in the native position block of draft 0 (flags, optional timestamp, position, symbol, course/speed, altitude);
               PPM codes only the comment. Reference for PACKPOS.
    PACKPOS=1  as POSNATIVE, with latitude, longitude, direction (5 degrees) and speed (to 255 kn) in one 7-byte integer (6 bytes without course/speed). Lossy.
+   PACKPOS=2  the same with Mic-E's resolution: direction in 1 degree steps (0 unknown, 1 to 360) and speed 0 to 999 kn in 1 kn steps, 8 bytes (6 without course/speed).
    WSPRCALL=1 callsigns (source, relay elements) as one 32-bit number, 4 bytes: WSPRSTAR=1 adds one byte per path that has a used mark (*), which a
               4-byte number cannot carry.
    PLAINTEXT=1  text that PPM cannot shrink goes in the native frame as it is (no ':' lead byte); with a position block and an empty comment, no text at all.
@@ -251,37 +252,42 @@ static int parse_pos(const char *info, Pos *P) {
 }
 static int pos_native_cost(const Pos *P, int packed) {
     int c = 1 + (P->has_ts ? 3 : 0) + 2 + (P->has_alt ? 4 : 0);
-    if (!P->comp) c += packed ? (P->has_cs ? 7 : 6) : 6 + (P->has_cs ? 3 : 0);
-    else c += packed ? (P->has_cs ? 7 : 6) + 1 + (P->cs_alt ? 2 : 0) : 7 + (P->cs_none ? 1 : 3);
+    int pk = P->has_cs ? (PACKPOS == 2 ? 8 : 7) : 6;
+    if (!P->comp) c += packed ? pk : 6 + (P->has_cs ? 3 : 0);
+    else c += packed ? pk + 1 + (P->cs_alt ? 2 : 0) : 7 + (P->cs_none ? 1 : 3);
     return c;
 }
+static long cs_course_chg, cs_speed_chg;
 static long pos_n, pos_cs, pos_comp, pos_diff, pos_diff_pos, pos_diff_course, pos_diff_speed, pos_roundtrip_fail;
-static int dir_of(int course) { int r = (course + 2) / 5; return course == 0 ? 0 : (r ? r : 1); }   /* 0 unknown, 1..72 (72 = north) */
-static int speed_of(int s) { return s > 255 ? 255 : s; }
+#define DMUL (PACKPOS == 2 ? 361ULL : 73ULL)     /* direction values: 0 unknown, then 1 to 72 (5 degrees) or 1 to 360 (1 degree) */
+#define SMUL (PACKPOS == 2 ? 1000ULL : 256ULL)   /* speed values: 0 to 255 or 0 to 999 kn */
+#define DSTEP (PACKPOS == 2 ? 1 : 5)
+static int dir_of(int course) { if (PACKPOS == 2) return course > 360 ? 360 : course; int r = (course + 2) / 5; return course == 0 ? 0 : (r ? r : 1); }   /* 0 unknown, 1..72 (72 = north) */
+static int speed_of(int s) { int m = (int)SMUL - 1; return s > m ? m : s; }
 /* the packed integer, its decoding, and the rebuilt text; counts what changes */
 static void pos_pack_check(const Pos *P, const char *info) {
     pos_n++; if (P->comp) pos_comp++; if (P->has_cs) pos_cs++;
     int dir = P->has_cs ? dir_of(P->course) : 0, spd = P->has_cs ? speed_of(P->speed) : 0;
-    uint64_t v = P->has_cs ? (((uint64_t)P->lat_idx * 2160000ULL + P->lon_idx) * 73 + dir) * 256 + spd : (uint64_t)P->lat_idx * 2160000ULL + P->lon_idx;
+    uint64_t v = P->has_cs ? (((uint64_t)P->lat_idx * 2160000ULL + P->lon_idx) * DMUL + dir) * SMUL + spd : (uint64_t)P->lat_idx * 2160000ULL + P->lon_idx;
     /* decode */
-    uint64_t w = v; int ds = 0, dd = 0; if (P->has_cs) { ds = (int)(w % 256); w /= 256; dd = (int)(w % 73); w /= 73; }
+    uint64_t w = v; int ds = 0, dd = 0; if (P->has_cs) { ds = (int)(w % SMUL); w /= SMUL; dd = (int)(w % DMUL); w /= DMUL; }
     long lo = (long)(w % 2160000ULL), la = (long)(w / 2160000ULL);
     if (la != P->lat_idx || lo != P->lon_idx || ds != spd || dd != dir) pos_roundtrip_fail++;
     /* rebuilt text */
     char out[400]; int k = 0; out[k++] = P->dt; if (P->has_ts) { memcpy(out + k, P->ts, 7); k += 7; }
-    int cdir = dd == 0 ? 0 : dd * 5;
+    int cdir = dd == 0 ? 0 : dd * DSTEP;
     if (!P->comp) {
         long H = la - 90 * 6000L; int s = H < 0; if (s) H = -H;
         k += sprintf(out + k, "%02ld%02ld.%02ld%c%c", H / 6000, (H % 6000) / 100, H % 100, s ? 'S' : 'N', P->tbl);
         long L = lo - 180 * 6000L; int w2 = L < 0; if (w2) L = -L;
         k += sprintf(out + k, "%03ld%02ld.%02ld%c%c", L / 6000, (L % 6000) / 100, L % 100, w2 ? 'W' : 'E', P->code);
-        if (P->has_cs) k += sprintf(out + k, "%03d/%03d", cdir, ds);
+        if (P->has_cs) { k += sprintf(out + k, "%03d/%03d", cdir, ds); if (cdir != P->course) cs_course_chg++; if (ds != P->speed) cs_speed_chg++; }
     } else {
         double lat = la / 6000.0 - 90, lon = lo / 6000.0 - 180;
         long y = (long)floor(380926.0 * (90 - lat)), x = (long)floor(190463.0 * (180 + lon));
         char yx[9]; for (int i = 3; i >= 0; i--) { yx[i] = 33 + y % 91; y /= 91; yx[4 + i] = 33 + x % 91; x /= 91; }
         out[k++] = P->tbl; memcpy(out + k, yx, 8); k += 8; out[k++] = P->code;
-        if (P->has_cs) { out[k++] = 33 + (int)lround(cdir / 4.0); out[k++] = 33 + (int)lround(log(ds + 1.0) / log(1.08)); } else { out[k++] = P->cs0; out[k++] = P->cs1; }
+        if (P->has_cs) { out[k] = 33 + (int)lround(cdir / 4.0); out[k + 1] = 33 + (int)lround(log(ds + 1.0) / log(1.08)); if (out[k] != P->cs0) cs_course_chg++; if (out[k + 1] != P->cs1) cs_speed_chg++; k += 2; } else { out[k++] = P->cs0; out[k++] = P->cs1; }
         out[k++] = P->T;
     }
     out[k] = 0;
@@ -292,7 +298,7 @@ static void pos_pack_check(const Pos *P, const char *info) {
         pos_diff++;
         if (P->comp) pos_diff_pos++;
         else if (P->has_cs && (cdir != P->course)) pos_diff_course++;
-        else if (P->has_cs && P->speed > 255) pos_diff_speed++;
+        else if (P->has_cs && P->speed > (int)SMUL - 1) pos_diff_speed++;
         else pos_diff_pos++;
     }
 }
@@ -435,11 +441,11 @@ int main(int argc, char **argv) {
     if (getenv("SELFTEST")) {                                    /* one packed position, decoded again */
         Pos P; const char *ex = "=3725.12N/12158.34W>123/045/A=000321 test"; parse_pos(ex, &P);
         int dir = dir_of(P.course), spd = speed_of(P.speed);
-        uint64_t v = (((uint64_t)P.lat_idx * 2160000ULL + P.lon_idx) * 73 + dir) * 256 + spd, w = v;
-        int ds = (int)(w % 256); w /= 256; int dd = (int)(w % 73); w /= 73; long lo = (long)(w % 2160000ULL), la = (long)(w / 2160000ULL);
+        uint64_t v = (((uint64_t)P.lat_idx * 2160000ULL + P.lon_idx) * DMUL + dir) * SMUL + spd, w = v;
+        int ds = (int)(w % SMUL); w /= SMUL; int dd = (int)(w % DMUL); w /= DMUL; long lo = (long)(w % 2160000ULL), la = (long)(w / 2160000ULL);
         printf("sample %s\n  lat_idx %ld lon_idx %ld dir_idx %d speed %d  v = %llu (%d bytes, max %llu)\n  decoded: lat %.6f lon %.6f course %d speed %d kn\n",
-               ex, P.lat_idx, P.lon_idx, dir, spd, (unsigned long long)v, v >> 48 ? 7 : 6, (unsigned long long)(1080001ULL * 2160000ULL * 73 * 256 - 1),
-               la / 6000.0 - 90, lo / 6000.0 - 180, dd * 5, ds);
+               ex, P.lat_idx, P.lon_idx, dir, spd, (unsigned long long)v, PACKPOS == 2 ? 8 : 7, (unsigned long long)(1080001ULL * 2160000ULL * DMUL * SMUL - 1),
+               la / 6000.0 - 90, lo / 6000.0 - 180, dd * DSTEP, ds);
         uint32_t code; char back[16]; wspr_encode("K6ATV-9", 7, &code); wspr_decode(code, back); printf("  callsign K6ATV-9 -> %u -> %s\n", code, back);
         return 0; }
     printf("%d packets\n", nrows);
@@ -447,7 +453,7 @@ int main(int argc, char **argv) {
     int lmask = getenv("LAYOUTS") ? atoi(getenv("LAYOUTS")) : 7, hpmax = getenv("NOHOP") ? 1 : 2;
     for (int hp_on = 0; hp_on < hpmax; hp_on++) {
       for (int ni = 0; ni < nN; ni++) for (int layout = 0; layout < 3; layout++) { if (!(lmask >> layout & 1)) continue;
-        Acc a[NG]; memset(a, 0, sizeof a); memset(tab, 0, sizeof(St) * HT); fails = 0; escapes = 0; pathrows = 0; unencodable = 0; memset(tc_class, 0, sizeof tc_class); pos_n = pos_cs = pos_comp = pos_diff = pos_diff_pos = pos_diff_course = pos_diff_speed = pos_roundtrip_fail = 0; wsp_ok = wsp_total = wsr_ok = wsr_total = wsp_fails = 0;
+        Acc a[NG]; memset(a, 0, sizeof a); memset(tab, 0, sizeof(St) * HT); fails = 0; escapes = 0; pathrows = 0; unencodable = 0; memset(tc_class, 0, sizeof tc_class); pos_n = pos_cs = pos_comp = pos_diff = pos_diff_pos = pos_diff_course = pos_diff_speed = pos_roundtrip_fail = cs_course_chg = cs_speed_chg = 0; wsp_ok = wsp_total = wsr_ok = wsr_total = wsp_fails = 0;
         for (int i = 0; i < nrows; i++) {
             Row *r = &rows[i]; char hpth[96]; int hopped = hp_on ? hop(r, hpth) : 0; int kind = 0;
             int fl = send_one(layout, Ns[ni], r, hopped, hpth, &kind);
@@ -469,7 +475,7 @@ int main(int argc, char **argv) {
         if (NATIVE && unencodable) printf("  sent as plain frames: %ld rows the native encoder cannot carry\n", unencodable);
         if (layout == 2 && TOCALL) { long t = tc_class[0] + tc_class[1] + tc_class[2] + tc_class[3]; if (t) printf("  destination: table (1 B) %.1f%%, registry pattern (2 B) %.1f%%, Mic-E (4 B) %.1f%%, escape %.1f%%   (%ld packets)\n", 100.0 * tc_class[0] / t, 100.0 * tc_class[1] / t, 100.0 * tc_class[2] / t, 100.0 * tc_class[3] / t, t); }
         if (layout == 2 && (PACKPOS || POSNATIVE) && pos_n) { printf("  position block: %ld packets carried natively (%ld compressed, %ld with course/speed)\n", pos_n, pos_comp, pos_cs);
-            if (PACKPOS) printf("  packed position: rebuilt text differs for %ld (%.1f%%): compressed re-encoding %ld, course rounded %ld, speed above 255 kn %ld; integer round trip failures %ld\n", pos_diff, 100.0 * pos_diff / pos_n, pos_diff_pos, pos_diff_course, pos_diff_speed, pos_roundtrip_fail); }
+            if (PACKPOS) printf("  packed position: rebuilt text differs for %ld (%.1f%%): compressed re-encoding %ld, course rounded %ld, speed above 255 kn %ld; integer round trip failures %ld; of %ld with course/speed, course token changed %ld, speed token changed %ld\n", pos_diff, 100.0 * pos_diff / pos_n, pos_diff_pos, pos_diff_course, pos_diff_speed, pos_roundtrip_fail, pos_cs, cs_course_chg, cs_speed_chg); }
         if (layout == 2 && WSPRCALL && wsp_total) printf("  callsigns packed into 4 bytes: source %.1f%% of %ld, relay elements %.1f%% of %ld; round trip failures %ld\n", 100.0 * wsp_ok / wsp_total, wsp_total, wsr_total ? 100.0 * wsr_ok / wsr_total : 0.0, wsr_total, wsp_fails);
       }
     }

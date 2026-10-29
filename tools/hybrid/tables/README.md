@@ -28,3 +28,26 @@ does all of it. A min count of 128 is what fits the 16-bit offset limit for abou
     LAYOUTS=1 ./hl_whole TEST.tsv 1 2 4        # whole packet; use LAYOUTS=2 with model_hybridA_nopath.c, LAYOUTS=4 with model_hybridB_info.c
 
 Test only on stations in hash buckets 0 to 2. To exclude the same stations from another training set, split by `md5(source callsign) % 10`.
+
+## Tables for the byte-saving variants (hybrid B with `NATIVE=1`)
+
+| File | Text it learns | Table size |
+|---|---|---|
+| `model_hybridB_info_native.c` | the text hybrid B hands to PPM with `NATIVE=1` and `PLAINTEXT=1` (position still in the text) | 77 KB |
+| `model_hybridB_comment.c` | the same with the position in the native frame (`PACKPOS=1` or `2`), so only the comment | 75 KB |
+| `tocall_table.txt` | the 192 most frequent destinations of the training stations (`E` lines) and the registry patterns with one wildcard (`APL...` entries only) | 104 lines |
+
+Trained on the training stations (callsign-hash buckets 3 to 9), the same split as the tables above. Like them, each table holds only byte-context counts
+(minimum counts 132 and 91) and no packet text; `tocall_table.txt` holds destination codes only. Rebuilding with the commands below gives byte-identical files.
+
+    prep.py train.tsv CAPTURES --train-from 3
+    tocall_table.py train.tsv tocalls.yaml tocall_table.txt
+    cc -std=c99 -O2 -Ireference tools/hybrid/hybrid_layouts.c reference/aprs_ppm.c tools/hybrid/tables/model_hybridB_info.c -lm -o hl_dump
+    HOPCALL=KD6DGI-10 NATIVE=1 PLAINTEXT=1 LAYOUTS=4 DUMPTEXT=1 ./hl_dump train.tsv > texts_info.txt
+    HOPCALL=KD6DGI-10 NATIVE=1 PLAINTEXT=1 LAYOUTS=4 PACKPOS=1 DUMPTEXT=1 ./hl_dump train.tsv > texts_comment.txt
+    train_layout_model.py --texts texts_info.txt    --mode info --min-count 16 --max-kb 79 --version 2 --out model_hybridB_info_native.c
+    train_layout_model.py --texts texts_comment.txt --mode info --min-count 16 --max-kb 79 --version 2 --out model_hybridB_comment.c
+
+`--max-kb` raises the minimum count until the table fits. Use with `NATIVE=1 TOCALL=1 TOCALLFILE=tables/tocall_table.txt PACKPOS=1` (or `PACKPOS=2`) and
+`LAYOUTS=4`; the comment table goes with `PACKPOS`, the other with a position left in the text. `tocall_table.txt` is built from our `APL...` data;
+a capture with other destinations should rebuild it (`--dest-prefix ''` in `prep.py`).
