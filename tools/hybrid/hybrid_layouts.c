@@ -275,7 +275,8 @@ static int parse_mice(const char *dst, int dl, const char *info, Pos *P) {
     if (!strncmp(dst, "APL", 3)) return 0;                                   /* LoRa device ids are tocalls whatever the comment starts with */
     for (int i = 0; i < tc_n; i++) if (!strcmp(tc_exact[i], dst)) return 0;   /* a destination the table knows is a tocall (an APL... packet whose comment starts with ` or ' is not Mic-E) */
     memset(P, 0, sizeof *P);
-    if (dl != 6 || strlen(info) < 9) return -1;
+    if (dl < 6 || strlen(info) < 9) return -1;
+    if (dl > 6) { if (dst[6] != '-' || dl > 9) return -1; for (int i = 7; i < dl; i++) if (dst[i] < '0' || dst[i] > '9') return -1; }   /* -SSID after the 6 latitude characters: the path code, not part of the position */
     for (int i = 0; i < 6; i++) if (!((dst[i] >= '0' && dst[i] <= '9') || (dst[i] >= 'A' && dst[i] <= 'L') || (dst[i] >= 'P' && dst[i] <= 'Z'))) return -1;
     int dv[6], cu[6], sd[6];
     for (int i = 0; i < 6; i++) { dv[i] = mice_digit(dst[i], &cu[i], &sd[i]); if (dv[i] < 0) return -2; }
@@ -444,7 +445,7 @@ static int send_one(int layout, int N, const Row *r, int hopped, const char *hp,
             int mr = parse_mice(dst, dl, info, &P);
             if (!hopped && mr != 0) { mice_seen++; if (mr == 1) mice_conv++; else if (mr == -2) mice_amb++; else mice_inv++; }
             if (mr == 1 && micedump && !hopped && layout == 2) fprintf(stderr, "%d %ld %ld %d %d\n", P.mstat, P.lat_idx, P.lon_idx, P.speed, P.course);
-            if (mr == 1) { body = P.comment; posb = pos_native_cost(&P, PACKPOS == 2); micedone = 1; if (!hopped) { mice_check(&P); char d6[8]; unsigned char bb[9]; mice_build(&P, d6, bb); if (strcmp(d6, dst) || memcmp(bb + 1, info + 1, 8)) { mice_exact_fail++; if (getenv("MICEDIFF") && mice_exact_fail <= 6) { fprintf(stderr, "orig %s ", dst); for (int q = 1; q <= 8; q++) fprintf(stderr, "%02x ", (unsigned char)info[q]); fprintf(stderr, "| rebuilt %s ", d6); for (int q = 1; q <= 8; q++) fprintf(stderr, "%02x ", bb[q]); fprintf(stderr, "| speed %d course %d\n", P.speed, P.course); } } } bempty = !*body; }
+            if (mr == 1) { body = P.comment; posb = pos_native_cost(&P, PACKPOS == 2); micedone = 1; if (!hopped) { mice_check(&P); char d6[8]; unsigned char bb[9]; mice_build(&P, d6, bb); if (strncmp(d6, dst, 6) || memcmp(bb + 1, info + 1, 8)) { mice_exact_fail++; if (getenv("MICEDIFF") && mice_exact_fail <= 6) { fprintf(stderr, "orig %s ", dst); for (int q = 1; q <= 8; q++) fprintf(stderr, "%02x ", (unsigned char)info[q]); fprintf(stderr, "| rebuilt %s ", d6); for (int q = 1; q <= 8; q++) fprintf(stderr, "%02x ", bb[q]); fprintf(stderr, "| speed %d course %d\n", P.speed, P.course); } } } bempty = !*body; }
         }
         if (!micedone && (PACKPOS || POSNATIVE) && parse_pos(info, &P)) { body = P.comment; posb = pos_native_cost(&P, PACKPOS); if (!hopped) { if (PACKPOS) pos_pack_check(&P, info); else pos_n++; }
                                                                                bempty = !*body; }

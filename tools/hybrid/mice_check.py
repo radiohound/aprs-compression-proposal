@@ -11,7 +11,11 @@ def dig(ch):
     if 'P'<=ch<='Y': return ord(ch)-80, 0, 1
     return None                                        # K, L, Z: a space (position ambiguity)
 def decode(dst, info):
-    if len(dst)!=6 or not info or info[0] not in "`'\x1c\x1d" or len(info)<9: return 'notmice' if (not info or info[0] not in "`'\x1c\x1d") else 'invalid'
+    if not info or info[0] not in "`'\x1c\x1d": return 'notmice'
+    if len(dst)>6:                                      # -SSID after the 6 latitude characters is the path code, not part of the position
+        if dst[6]!='-' or len(dst)>9 or not dst[7:].isdigit(): return 'invalid'
+        dst=dst[:6]
+    if len(dst)!=6 or len(info)<9: return 'invalid'
     if not re.fullmatch(r"[0-9A-LP-Z]{6}", dst): return 'invalid'
     d=[dig(c) for c in dst]
     if any(x is None for x in d): return 'ambiguous'

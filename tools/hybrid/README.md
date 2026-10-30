@@ -247,10 +247,10 @@ Mic-E destination outside the table (default 6). Ambiguous positions (K, L or Z 
 
 **Test sets** (callsign-hash buckets 0 to 2, real callsigns, not committed): `mice_sets.py` builds them from raw captures that keep every destination (the `APL...` captures have no Mic-E).
 - *LoRa-gated*: packets a LoRa iGate gated as heard over RF, all destinations. 6,157 packets from 508 stations; 112 are Mic-E (1.8%), none ambiguous.
-- *Any source*: every Mic-E packet in the captures, mostly VHF. 11,979 packets from 761 stations; 11,187 decode, 728 are ambiguous (6.1%), 51 invalid.
+- *Any source*: every Mic-E packet in the captures, mostly VHF. 11,979 packets from 761 stations; 11,223 decode, 728 are ambiguous (6.1%), 15 invalid. A destination may carry an `-SSID` after its 6 latitude characters (the digipeater path code); it is ignored.
 
 **Checks.** `SELFTEST=1` writes and decodes all 15 message statuses (0 is Emergency): 0 failures. `mice_check.py` is an independent decoder: it gives identical values for all 112 and
-11,187 packets (`MICEDUMP=1`). The 39 Mic-E packets in an Arizona recording all decode to 33.45 to 33.61 N and 112.12 to 111.94 W, which is Phoenix. The packed integer (the 8 byte
+11,223 packets (`MICEDUMP=1`). The 39 Mic-E packets in an Arizona recording all decode to 33.45 to 33.61 N and 112.12 to 111.94 W, which is Phoenix. The packed integer (the 8 byte
 `PACKPOS=2` integer times 16, plus the status) round-trips with 0 failures. Writing the characters back from the values reproduces 110 of 112 packets in the LoRa-gated set but only 82% in the
 any-source set: devices differ in how they write speed and course (+800 / +400 or the plain form). An exact-character Mic-E block (not done here) must store the characters.
 
@@ -280,3 +280,9 @@ Commands:
     mice_check.py TEST.tsv                                            # outcomes and status values; "dump" for a per-packet listing
     HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tables/tocall_table_v2.txt LAYOUTS=4 PLAINTEXT=1 TOCALL=1 POSNATIVE=1 MICE2NATIVE=1 ./hl TEST.tsv 1 2
     HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tables/tocall_table_v2.txt LAYOUTS=4 PLAINTEXT=1 TOCALL=1 PACKPOS=2 MICE2NATIVE=1 ./hl TEST.tsv 1 2
+
+**Mic-E packets with a LoRa destination.** A search of all our captures (about 797,000 packets) found 43 packets whose information field is Mic-E (type byte, at least 9 bytes) but whose destination is
+`APLRG1`, from 6 stations, all heard by LoRa iGates. Each has a twin from the same station with identical information bytes and an ordinary Mic-E destination, so the `APLRG1` copy is the same packet with its
+destination (which carries the latitude and the message status) replaced by a LoRa device's own tocall. From the `APLRG1` copy alone the position cannot be recovered. Which device rewrites the destination is not
+known; a gateway that rebuilds a packet from APRS-IS or from a VHF packet before sending it on LoRa would explain it. These packets are Mic-E that `MICE2NATIVE` cannot convert, and a selection by `APL...` destination
+treats them as ordinary LoRa traffic. (The other Mic-E-type packets with an unusual destination in the captures are Mic-E with an `-SSID` after the 6 characters.)
