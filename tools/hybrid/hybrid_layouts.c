@@ -99,17 +99,26 @@ static int path_block_native(const char *p) {
 
 
 /* ---- byte-saving variants measured on hybrid B (all off by default; they need NATIVE=1) ----
-   TOCALL=1   destination from a table of the most frequent destinations (1 byte), a one-wildcard registry pattern (2 bytes), Mic-E (4 bytes, estimate)
+   TOCALL=1   destination from a table of the most frequent destinations (1 byte), a one-wildcard registry pattern (2 bytes), Mic-E (6 bytes: escape + 5 byte element; MICE_DST=4 gives the old estimate)
               or an escape byte + the native element; TOCALLFILE names the table (tocall_table.py, built from the training stations only)
    POSNATIVE=1  position packets go in the native position block of draft 0 (flags, optional timestamp, position, symbol, course/speed, altitude);
               PPM codes only the comment. Reference for PACKPOS.
    PACKPOS=1  as POSNATIVE, with latitude, longitude, direction (5 degrees) and speed (to 255 kn) in one 7-byte integer (6 bytes without course/speed). Lossy.
    PACKPOS=2  the same with Mic-E's resolution: direction in 1 degree steps (0 unknown, 1 to 360) and speed 0 to 999 kn in 1 kn steps, 8 bytes (6 without course/speed).
+   MICE2NATIVE=1  models a new-format tracker that sends a native position instead of Mic-E (needs NATIVE=1 and PACKPOS=2 or POSNATIVE=1): the Mic-E latitude, longitude, speed,
+              course, symbol and 4-bit message status (3 bits plus a custom/standard flag) become a native position; the rest of the information field goes to PPM; the
+              destination costs 1 byte (the tracker's own tocall). With PACKPOS=2 the status is folded into the packed integer (v*16 + status): no extra byte. With POSNATIVE=1
+              (lossless draft-0 block) a status byte is added, except when the status equals MICE_DEF (default -1: always). Value-lossless, not text-lossless (the text is no longer Mic-E).
+              Ambiguous positions (K, L, Z in the latitude) and invalid packets stay text and are counted.
+   MICE_KEEPDST=1 charge the Mic-E destination as before instead of 1 byte (isolates the position)
+   MICE_DEF=n status value that needs no status byte in the lossless block (0..15; bits + 8 if custom), default -1
    WSPRCALL=1 callsigns (source, relay elements) as one 32-bit number, 4 bytes: WSPRSTAR=1 adds one byte per path that has a used mark (*), which a
               4-byte number cannot carry.
    PLAINTEXT=1  text that PPM cannot shrink goes in the native frame as it is (no ':' lead byte); with a position block and an empty comment, no text at all.
    HOPCALL=C  the simulated relay's callsign in the "after one relay hop" pass (default DIGI-10; use one that packs, such as KD6DGI-10). */
-static int TOCALL = 0, PACKPOS = 0, POSNATIVE = 0, WSPRCALL = 0, WSPRSTAR = 0, PLAINTEXT = 0;
+static int TOCALL = 0, PACKPOS = 0, POSNATIVE = 0, WSPRCALL = 0, WSPRSTAR = 0, PLAINTEXT = 0, MICE2NATIVE = 0, MICE_DEF = -1;
+static int micedump = 0, MICE_DST = 6;   /* Mic-E destination outside the table: escape byte + 5 byte element (measured by moricef, 29 Oct 2026; the first estimate was 4) */
+static long mice_seen, mice_conv, mice_amb, mice_inv, mice_rtfail, mice_exact_fail, mice_stat[16];
 static const char *HOPCALL = "DIGI-10";
 static FILE *dumpf;
 
@@ -137,7 +146,7 @@ static int tocall_cost(const char *dst, int dl, const char *info) {
         }
         if (ok && w >= 0) { tc_class[1]++; return 2; }
     }
-    if (info[0] == '`' || info[0] == '\'') { tc_class[2]++; return 4; }
+    if (info[0] == '`' || info[0] == '\'') { tc_class[2]++; return MICE_DST; }
     int e = elem_native(dst, dl); if (e < 0) return -1;
     tc_class[3]++; return 1 + e;
 }
@@ -204,7 +213,7 @@ static int path_block_wspr(const char *p) {
 
 /* position packets */
 typedef struct { char dt; int has_ts; char ts[8]; int comp, has_cs, cs_alt, cs_none; long lat_idx, lon_idx; int course, speed;
-    char tbl, code, T, cs0, cs1; char yx[9]; char ext[8]; int has_alt, alt_off; char altstr[8]; char comment[260]; } Pos;
+    char tbl, code, T, cs0, cs1; char yx[9]; char ext[8]; int has_alt, alt_off; char altstr[8]; char comment[260]; int mice, mstat; } Pos;
 static int b91(const char *s, int n, long *v) { *v = 0; for (int i = 0; i < n; i++) { if (s[i] < 33 || s[i] > 123) return 0; *v = *v * 91 + s[i] - 33; } return 1; }
 static int parse_pos(const char *info, Pos *P) {
     memset(P, 0, sizeof *P); char d = info[0]; if (!(d == '!' || d == '=' || d == '/' || d == '@')) return 0;
@@ -250,7 +259,81 @@ static int parse_pos(const char *info, Pos *P) {
             memmove(a, a + 3 + neg + nd, strlen(a + 3 + neg + nd) + 1); } }
     return 1;
 }
+
+/* Mic-E (APRS101 ch. 10): latitude, message bits, N/S, longitude offset and E/W in the 6 destination characters; longitude, speed, course, symbol in info bytes 1..8.
+   Returns 1 decoded into P (an uncompressed position with course/speed; P->mstat = 3 message bits + 8 if custom), 0 not Mic-E, -1 Mic-E kept as text (-2 ambiguous position). */
+static int mice_digit(char ch, int *cust, int *stdb) {
+    *cust = *stdb = 0;
+    if (ch >= '0' && ch <= '9') return ch - '0';
+    if (ch >= 'A' && ch <= 'J') { *cust = 1; return ch - 'A'; }
+    if (ch >= 'P' && ch <= 'Y') { *stdb = 1; return ch - 'P'; }
+    return -1;                                    /* K, L, Z: a space = position ambiguity */
+}
+static int parse_mice(const char *dst, int dl, const char *info, Pos *P) {
+    unsigned char c0 = (unsigned char)info[0];
+    if (!(c0 == '`' || c0 == '\'' || c0 == 0x1C || c0 == 0x1D)) return 0;
+    if (!strncmp(dst, "APL", 3)) return 0;                                   /* LoRa device ids are tocalls whatever the comment starts with */
+    for (int i = 0; i < tc_n; i++) if (!strcmp(tc_exact[i], dst)) return 0;   /* a destination the table knows is a tocall (an APL... packet whose comment starts with ` or ' is not Mic-E) */
+    memset(P, 0, sizeof *P);
+    if (dl != 6 || strlen(info) < 9) return -1;
+    for (int i = 0; i < 6; i++) if (!((dst[i] >= '0' && dst[i] <= '9') || (dst[i] >= 'A' && dst[i] <= 'L') || (dst[i] >= 'P' && dst[i] <= 'Z'))) return -1;
+    int dv[6], cu[6], sd[6];
+    for (int i = 0; i < 6; i++) { dv[i] = mice_digit(dst[i], &cu[i], &sd[i]); if (dv[i] < 0) return -2; }
+    for (int i = 3; i < 6; i++) if (cu[i]) return -1;                      /* characters 4 to 6 carry flags only from the P..Z set */
+    int anyc = cu[0] | cu[1] | cu[2], anys = sd[0] | sd[1] | sd[2];
+    if (anyc && anys) return -1;                                           /* custom and standard mixed */
+    int bits = ((cu[0] | sd[0]) << 2) | ((cu[1] | sd[1]) << 1) | (cu[2] | sd[2]);
+    int north = sd[3], off = sd[4], west = sd[5], mm = dv[2] * 10 + dv[3];
+    long lat_h = (long)(dv[0] * 10 + dv[1]) * 6000 + mm * 100 + dv[4] * 10 + dv[5];
+    if (mm >= 60 || lat_h > 90 * 6000L) return -1;
+    const unsigned char *b = (const unsigned char *)info;
+    for (int i = 1; i <= 6; i++) if (b[i] < 28 || b[i] > 127) return -1;
+    if (b[7] < 33 || b[7] > 126) return -1;
+    int lo = b[1] - 28; if (off) lo += 100; if (lo >= 190 && lo <= 199) lo -= 190; else if (lo >= 180 && lo <= 189) lo -= 80;
+    int m = b[2] - 28; if (m >= 60) m -= 60; int h = b[3] - 28;
+    int sp = b[4] - 28, dc = b[5] - 28, se = b[6] - 28, speed = sp * 10 + dc / 10, course = (dc % 10) * 100 + se;
+    if (speed >= 800) speed -= 800; if (course >= 400) course -= 400;
+    if (lo > 180 || m > 59 || h > 99 || course > 360) return -1;
+    long lon_h = (long)lo * 6000 + m * 100 + h;
+    P->dt = '!'; P->comp = 0; P->lat_idx = 90 * 6000L + (north ? lat_h : -lat_h);
+    P->lon_idx = (180 * 6000L + (west ? -lon_h : lon_h)) % 2160000L; if (P->lon_idx < 0) P->lon_idx += 2160000L;
+    P->has_cs = (speed > 0 || course > 0); P->course = course; P->speed = speed;
+    P->tbl = (char)b[8]; P->code = (char)b[7];
+    strncpy(P->comment, info + 9, 259);
+    P->mice = 1; P->mstat = bits + ((anyc && bits) ? 8 : 0);
+    return 1;
+}
+
+/* Mic-E encoder: the 6 destination characters and info bytes 1..8 from decoded values (the inverse of parse_mice). Used by SELFTEST and to check every real packet:
+   a Mic-E packet whose characters are not what this writes back used another, equivalent encoding. */
+static void mice_build(const Pos *P, char *dst6, unsigned char *b) {
+    long la = P->lat_idx - 90 * 6000L, lh = la < 0 ? -la : la; int north = la >= 0, d[6], msg = P->mstat & 7, cust = (P->mstat >> 3) & 1;
+    d[0] = (int)(lh / 6000) / 10; d[1] = (int)(lh / 6000) % 10; d[2] = (int)((lh % 6000) / 100) / 10; d[3] = (int)((lh % 6000) / 100) % 10; d[4] = (int)(lh % 100) / 10; d[5] = (int)(lh % 100) % 10;
+    for (int i = 0; i < 3; i++) dst6[i] = (char)(((msg >> (2 - i)) & 1) ? (cust ? 'A' : 'P') + d[i] : '0' + d[i]);
+    long lo = P->lon_idx - 180 * 6000L; int west = lo < 0; long lw = lo < 0 ? -lo : lo; int deg = (int)(lw / 6000), mn = (int)((lw % 6000) / 100), hu = (int)(lw % 100), off, b1;
+    if (deg <= 9) { off = 1; b1 = deg + 118; } else if (deg <= 99) { off = 0; b1 = deg + 28; } else if (deg <= 109) { off = 1; b1 = deg + 8; } else { off = 1; b1 = deg - 72; }
+    dst6[3] = (char)(north ? 'P' + d[3] : '0' + d[3]); dst6[4] = (char)(off ? 'P' + d[4] : '0' + d[4]); dst6[5] = (char)(west ? 'P' + d[5] : '0' + d[5]); dst6[6] = 0;
+    int spd = P->has_cs ? P->speed : 0, crs = P->has_cs ? P->course : 0;
+    b[1] = (unsigned char)b1; b[2] = (unsigned char)(mn < 10 ? mn + 88 : mn + 28); b[3] = (unsigned char)(hu + 28);
+    /* the usual form: speed under 200 kn is written with +800 (SP 80..99), course with +400 (hundreds digit 4..7); the decoder subtracts them again */
+    b[4] = (unsigned char)((spd < 200 ? spd / 10 + 80 : spd / 10) + 28); b[5] = (unsigned char)((spd % 10) * 10 + crs / 100 + 4 + 28); b[6] = (unsigned char)(crs % 100 + 28);
+    b[7] = (unsigned char)P->code; b[8] = (unsigned char)P->tbl;
+}
+/* the packed integer for a Mic-E position (the 8 byte PACKPOS=2 layout times 16 for the status), decoded again; counts mismatches */
+static void mice_check(const Pos *P) {
+    uint64_t base = (uint64_t)P->lat_idx * 2160000ULL + P->lon_idx, v; int dir = P->has_cs ? P->course : 0, spd = P->has_cs ? (P->speed > 999 ? 999 : P->speed) : 0;
+    v = P->has_cs ? (((base * 361 + dir) * 1000 + spd) * 16 + P->mstat) : base * 16 + P->mstat;
+    uint64_t w = v; int st = (int)(w % 16); w /= 16; int ds = 0, dd = 0;
+    if (P->has_cs) { ds = (int)(w % 1000); w /= 1000; dd = (int)(w % 361); w /= 361; }
+    long lo = (long)(w % 2160000ULL), la = (long)(w / 2160000ULL);
+    if (st != P->mstat || la != P->lat_idx || lo != P->lon_idx || ds != spd || dd != dir) mice_rtfail++;
+    mice_stat[P->mstat & 15]++;
+}
 static int pos_native_cost(const Pos *P, int packed) {
+    if (P->mice) {                                                /* flags byte, symbol (2), then the packed integer (status folded in) or the lossless block plus a status byte */
+        if (packed) return 1 + 2 + (P->has_cs ? 8 : 6);
+        return 1 + 2 + 6 + (P->has_cs ? 3 : 0) + ((MICE_DEF >= 0 && P->mstat == MICE_DEF) ? 0 : 1);
+    }
     int c = 1 + (P->has_ts ? 3 : 0) + 2 + (P->has_alt ? 4 : 0);
     int pk = P->has_cs ? (PACKPOS == 2 ? 8 : 7) : 6;
     if (!P->comp) c += packed ? pk : 6 + (P->has_cs ? 3 : 0);
@@ -356,7 +439,14 @@ static int send_one(int layout, int N, const Row *r, int hopped, const char *hp,
     else if (layout == 1) { tl = snprintf((char *)t, 300, "%.*s>%s:%s", srcl, r->text, dst, info); extra = pathextra; }
     else {
         const char *body = info; Pos P;
-        if ((PACKPOS || POSNATIVE) && parse_pos(info, &P)) { body = P.comment; posb = pos_native_cost(&P, PACKPOS); if (!hopped) { if (PACKPOS) pos_pack_check(&P, info); else pos_n++; }
+        int micedone = 0;
+        if (MICE2NATIVE) {
+            int mr = parse_mice(dst, dl, info, &P);
+            if (!hopped && mr != 0) { mice_seen++; if (mr == 1) mice_conv++; else if (mr == -2) mice_amb++; else mice_inv++; }
+            if (mr == 1 && micedump && !hopped && layout == 2) fprintf(stderr, "%d %ld %ld %d %d\n", P.mstat, P.lat_idx, P.lon_idx, P.speed, P.course);
+            if (mr == 1) { body = P.comment; posb = pos_native_cost(&P, PACKPOS == 2); micedone = 1; if (!hopped) { mice_check(&P); char d6[8]; unsigned char bb[9]; mice_build(&P, d6, bb); if (strcmp(d6, dst) || memcmp(bb + 1, info + 1, 8)) { mice_exact_fail++; if (getenv("MICEDIFF") && mice_exact_fail <= 6) { fprintf(stderr, "orig %s ", dst); for (int q = 1; q <= 8; q++) fprintf(stderr, "%02x ", (unsigned char)info[q]); fprintf(stderr, "| rebuilt %s ", d6); for (int q = 1; q <= 8; q++) fprintf(stderr, "%02x ", bb[q]); fprintf(stderr, "| speed %d course %d\n", P.speed, P.course); } } } bempty = !*body; }
+        }
+        if (!micedone && (PACKPOS || POSNATIVE) && parse_pos(info, &P)) { body = P.comment; posb = pos_native_cost(&P, PACKPOS); if (!hopped) { if (PACKPOS) pos_pack_check(&P, info); else pos_n++; }
                                                                                bempty = !*body; }
         tl = snprintf((char *)t, 300, ":%s", body);               /* leading ':' so the model sees a familiar start */
         int dc = dst_code(dst);
@@ -368,7 +458,8 @@ static int send_one(int layout, int N, const Row *r, int hopped, const char *hp,
                 else sb = elem_native((const char *)r->text, srcl);
                 pb = path_block_wspr(path);
             } else sb = elem_native((const char *)r->text, srcl);
-            if (TOCALL) db = tocall_cost(dst, dl, info); else db = DSTCODE && dc >= 0 ? 1 : elem_native(dst, dl);
+            if (micedone && !getenv("MICE_KEEPDST")) db = 1;   /* a native-position tracker sends its own tocall, a table hit (MICE_KEEPDST=1 keeps the Mic-E destination cost, to see the position alone) */
+            else if (TOCALL) db = tocall_cost(dst, dl, info); else db = DSTCODE && dc >= 0 ? 1 : elem_native(dst, dl);
             if (sb < 0 || db < 0 || pb < 0) { unencodable++; *kindout = 2; return 3 + r->tl; }
             extra = sb + db + pb + posb;
         } else
@@ -411,12 +502,15 @@ int main(int argc, char **argv) {
     if (getenv("NATIVE")) NATIVE = atoi(getenv("NATIVE"));
     if (getenv("TOCALL")) TOCALL = atoi(getenv("TOCALL"));
     if (getenv("PACKPOS")) PACKPOS = atoi(getenv("PACKPOS"));
+    if (getenv("MICE2NATIVE")) MICE2NATIVE = atoi(getenv("MICE2NATIVE"));
+    if (getenv("MICE_DEF")) MICE_DEF = atoi(getenv("MICE_DEF"));
+    micedump = getenv("MICEDUMP") != NULL; if (getenv("MICE_DST")) MICE_DST = atoi(getenv("MICE_DST"));
     if (getenv("POSNATIVE")) POSNATIVE = atoi(getenv("POSNATIVE"));
     if (getenv("WSPRCALL")) WSPRCALL = atoi(getenv("WSPRCALL"));
     if (getenv("WSPRSTAR")) WSPRSTAR = atoi(getenv("WSPRSTAR"));
     if (getenv("PLAINTEXT")) PLAINTEXT = atoi(getenv("PLAINTEXT"));
     if (getenv("HOPCALL")) HOPCALL = getenv("HOPCALL");
-    if ((TOCALL || PACKPOS || POSNATIVE || WSPRCALL) && !NATIVE) { fprintf(stderr, "TOCALL, PACKPOS, POSNATIVE and WSPRCALL need NATIVE=1\n"); return 1; }
+    if ((TOCALL || PACKPOS || POSNATIVE || WSPRCALL || MICE2NATIVE) && !NATIVE) { fprintf(stderr, "TOCALL, PACKPOS, POSNATIVE and WSPRCALL need NATIVE=1\n"); return 1; }
     if (TOCALL) { if (!getenv("TOCALLFILE")) { fprintf(stderr, "TOCALL=1 needs TOCALLFILE (tocall_table.py)\n"); return 1; } tocall_load(getenv("TOCALLFILE")); }
     if (getenv("DUMPTEXT")) dumpf = stdout;
     if (getenv("DSTCODE")) DSTCODE = atoi(getenv("DSTCODE"));
@@ -446,6 +540,12 @@ int main(int argc, char **argv) {
         printf("sample %s\n  lat_idx %ld lon_idx %ld dir_idx %d speed %d  v = %llu (%d bytes, max %llu)\n  decoded: lat %.6f lon %.6f course %d speed %d kn\n",
                ex, P.lat_idx, P.lon_idx, dir, spd, (unsigned long long)v, PACKPOS == 2 ? 8 : 7, (unsigned long long)(1080001ULL * 2160000ULL * DMUL * SMUL - 1),
                la / 6000.0 - 90, lo / 6000.0 - 180, dd * DSTEP, ds);
+        { /* Mic-E: every message status, standard and custom, written and decoded again (value 0 is Emergency) */
+            int bad = 0, n = 0; Pos Q; memset(&Q, 0, sizeof Q); Q.lat_idx = 90 * 6000L + 3348 * 100L + 25; Q.lon_idx = 180 * 6000L - (112 * 6000L + 7 * 100 + 46); Q.has_cs = 1; Q.speed = 25; Q.course = 357; Q.code = '>'; Q.tbl = '/';
+            for (int stv = 0; stv < 16; stv++) { if (stv > 8 && (stv & 7) == 0) continue; if (stv == 8) continue; Q.mstat = stv; char d6[8]; unsigned char bb[9]; bb[0] = '`'; mice_build(&Q, d6, bb);
+                char info[16]; info[0] = '`'; memcpy(info + 1, bb + 1, 8); info[9] = 0; Pos R; int r = parse_mice(d6, 6, info, &R); n++;
+                if (r != 1 || R.mstat != stv || R.lat_idx != Q.lat_idx || R.lon_idx != Q.lon_idx || R.speed != 25 || R.course != 357) { bad++; printf("  Mic-E status %d: FAILED (decode %d)\n", stv, r); } }
+            printf("Mic-E self-test: %d status values (0 = Emergency, 1..7 standard bits, 9..15 custom) written and decoded again, %d failures; sample dest %s\n", n, bad, "S32U6T"); }
         uint32_t code; char back[16]; wspr_encode("K6ATV-9", 7, &code); wspr_decode(code, back); printf("  callsign K6ATV-9 -> %u -> %s\n", code, back);
         return 0; }
     printf("%d packets\n", nrows);
@@ -453,7 +553,7 @@ int main(int argc, char **argv) {
     int lmask = getenv("LAYOUTS") ? atoi(getenv("LAYOUTS")) : 7, hpmax = getenv("NOHOP") ? 1 : 2;
     for (int hp_on = 0; hp_on < hpmax; hp_on++) {
       for (int ni = 0; ni < nN; ni++) for (int layout = 0; layout < 3; layout++) { if (!(lmask >> layout & 1)) continue;
-        Acc a[NG]; memset(a, 0, sizeof a); memset(tab, 0, sizeof(St) * HT); fails = 0; escapes = 0; pathrows = 0; unencodable = 0; memset(tc_class, 0, sizeof tc_class); pos_n = pos_cs = pos_comp = pos_diff = pos_diff_pos = pos_diff_course = pos_diff_speed = pos_roundtrip_fail = cs_course_chg = cs_speed_chg = 0; wsp_ok = wsp_total = wsr_ok = wsr_total = wsp_fails = 0;
+        Acc a[NG]; memset(a, 0, sizeof a); memset(tab, 0, sizeof(St) * HT); fails = 0; escapes = 0; pathrows = 0; unencodable = 0; memset(tc_class, 0, sizeof tc_class); pos_n = pos_cs = pos_comp = pos_diff = pos_diff_pos = pos_diff_course = pos_diff_speed = pos_roundtrip_fail = cs_course_chg = cs_speed_chg = 0; mice_seen = mice_conv = mice_amb = mice_inv = mice_rtfail = mice_exact_fail = 0; memset(mice_stat, 0, sizeof mice_stat); wsp_ok = wsp_total = wsr_ok = wsr_total = wsp_fails = 0;
         for (int i = 0; i < nrows; i++) {
             Row *r = &rows[i]; char hpth[96]; int hopped = hp_on ? hop(r, hpth) : 0; int kind = 0;
             int fl = send_one(layout, Ns[ni], r, hopped, hpth, &kind);
@@ -473,9 +573,11 @@ int main(int argc, char **argv) {
                 100 * (1 - a[g].ac12 / a[g].ap12), 100 * (1 - a[g].ac7 / a[g].ap7), 100.0 * a[g].primed / a[g].n); }
         if (layout == 1) printf("  path block: %ld rows, %ld needed the escape (%.1f%%)\n", pathrows, escapes, 100.0 * escapes / (pathrows ? pathrows : 1));
         if (NATIVE && unencodable) printf("  sent as plain frames: %ld rows the native encoder cannot carry\n", unencodable);
-        if (layout == 2 && TOCALL) { long t = tc_class[0] + tc_class[1] + tc_class[2] + tc_class[3]; if (t) printf("  destination: table (1 B) %.1f%%, registry pattern (2 B) %.1f%%, Mic-E (4 B) %.1f%%, escape %.1f%%   (%ld packets)\n", 100.0 * tc_class[0] / t, 100.0 * tc_class[1] / t, 100.0 * tc_class[2] / t, 100.0 * tc_class[3] / t, t); }
+        if (layout == 2 && TOCALL) { long t = tc_class[0] + tc_class[1] + tc_class[2] + tc_class[3]; if (t) printf("  destination: table (1 B) %.1f%%, registry pattern (2 B) %.1f%%, Mic-E (%d B) %.1f%%, escape %.1f%%   (%ld packets)\n", 100.0 * tc_class[0] / t, 100.0 * tc_class[1] / t, MICE_DST, 100.0 * tc_class[2] / t, 100.0 * tc_class[3] / t, t); }
         if (layout == 2 && (PACKPOS || POSNATIVE) && pos_n) { printf("  position block: %ld packets carried natively (%ld compressed, %ld with course/speed)\n", pos_n, pos_comp, pos_cs);
             if (PACKPOS) printf("  packed position: rebuilt text differs for %ld (%.1f%%): compressed re-encoding %ld, course rounded %ld, speed above 255 kn %ld; integer round trip failures %ld; of %ld with course/speed, course token changed %ld, speed token changed %ld\n", pos_diff, 100.0 * pos_diff / pos_n, pos_diff_pos, pos_diff_course, pos_diff_speed, pos_roundtrip_fail, pos_cs, cs_course_chg, cs_speed_chg); }
+        if (layout == 2 && MICE2NATIVE) { printf("  Mic-E: %ld seen, %ld sent as a native position, %ld left as text (ambiguous position %ld, invalid or mixed %ld); packed integer round trip failures %ld; rebuilding the 6 destination and 8 information characters from the values differs for %ld\n    status values (bits, +8 custom):", mice_seen, mice_conv, mice_amb + mice_inv, mice_amb, mice_inv, mice_rtfail, mice_exact_fail);
+            for (int i = 0; i < 16; i++) if (mice_stat[i]) printf(" %d:%ld", i, mice_stat[i]); printf("\n"); }
         if (layout == 2 && WSPRCALL && wsp_total) printf("  callsigns packed into 4 bytes: source %.1f%% of %ld, relay elements %.1f%% of %ld; round trip failures %ld\n", 100.0 * wsp_ok / wsp_total, wsp_total, wsr_total ? 100.0 * wsr_ok / wsr_total : 0.0, wsr_total, wsp_fails);
       }
     }

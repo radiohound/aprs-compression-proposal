@@ -232,3 +232,51 @@ Commands (private captures `CAPTURES`; `hl` is the harness built with the table 
     tocall_table.py train.tsv tocalls.yaml tables/tocall_table.txt   # 192 exact destinations + one-wildcard APL patterns
     cc -std=c99 -O2 -Ireference tools/hybrid/hybrid_layouts.c reference/aprs_ppm.c TABLE.c -lm -o hl
     HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tools/hybrid/tables/tocall_table.txt LAYOUTS=4 PLAINTEXT=1 PACKPOS=1 TOCALL=1 WSPRCALL=1 ./hl test.tsv 1 2    # hybrid B, all three
+
+## Mic-E in hybrid B (`MICE2NATIVE=1`)
+
+Draft 0 has no Mic-E block, so a Mic-E packet goes through as text: the destination (6 characters that are really the latitude) costs 6 bytes (escape plus the 5 byte native
+element, as moricef measured), and the information field goes to PPM, which compresses Mic-E's printable binary badly. `MICE2NATIVE=1` models what happens if a new-format tracker
+sends a native position instead of Mic-E: the Mic-E latitude, longitude, speed, course, symbol and message status become a native position, the rest of the information field
+(altitude, device suffix, comment) goes to PPM, and the destination is the tracker's own tocall (1 byte, a table hit). It needs `NATIVE=1` and `PACKPOS=2` or `POSNATIVE=1`.
+It is value-lossless, not text-lossless: the rebuilt text is an ordinary position, not Mic-E.
+
+Decoding follows APRS101 chapter 10, with the message status as 3 bits plus a flag for the 7 custom messages (15 values; 3 bits alone would make a custom message look like a standard
+one). `MICE_DEF=n` says which status needs no status byte in the lossless block; `MICE_KEEPDST=1` keeps the Mic-E destination cost to show the position alone; `MICE_DST` is the cost of a
+Mic-E destination outside the table (default 6). Ambiguous positions (K, L or Z in the latitude) and invalid packets stay text and are counted.
+
+**Test sets** (callsign-hash buckets 0 to 2, real callsigns, not committed): `mice_sets.py` builds them from raw captures that keep every destination (the `APL...` captures have no Mic-E).
+- *LoRa-gated*: packets a LoRa iGate gated as heard over RF, all destinations. 6,157 packets from 508 stations; 112 are Mic-E (1.8%), none ambiguous.
+- *Any source*: every Mic-E packet in the captures, mostly VHF. 11,979 packets from 761 stations; 11,187 decode, 728 are ambiguous (6.1%), 51 invalid.
+
+**Checks.** `SELFTEST=1` writes and decodes all 15 message statuses (0 is Emergency): 0 failures. `mice_check.py` is an independent decoder: it gives identical values for all 112 and
+11,187 packets (`MICEDUMP=1`). The 39 Mic-E packets in an Arizona recording all decode to 33.45 to 33.61 N and 112.12 to 111.94 W, which is Phoenix. The packed integer (the 8 byte
+`PACKPOS=2` integer times 16, plus the status) round-trips with 0 failures. Writing the characters back from the values reproduces 110 of 112 packets in the LoRa-gated set but only 82% in the
+any-source set: devices differ in how they write speed and course (+800 / +400 or the plain form). An exact-character Mic-E block (not done here) must store the characters.
+
+**Results**, full frames (N=1), bytes saved against the plain frame, tocall v2:
+
+| Variant | Mic-E only, LoRa-gated (112) | all packets, LoRa-gated (6,157) | Mic-E, any source (11,979) |
+|---|---|---|---|
+| whole-packet PPM | 42.2 B, 3.4% | 39.0 B, 38.0% | 60.0 B, 5.2% |
+| B + lossless position, Mic-E as text (current scope) | 32.3 B, 26.0% | 35.6 B, 43.4% | 47.8 B, 24.4% |
+| same, `MICE2NATIVE`, status byte always | 31.2 B, 28.4% | 35.6 B, 43.4% | 46.3 B, 26.8% |
+| same, no byte for the commonest status | 30.3 B, 30.5% | 35.6 B, 43.4% | 46.0 B, 27.3% |
+| B + `PACKPOS=2`, Mic-E as text | 32.3 B, 26.0% | 34.8 B, 44.7% | 47.8 B, 24.4% |
+| same, `MICE2NATIVE` (status folded in) | 29.2 B, 33.0% | 34.7 B, 44.8% | 44.5 B, 29.6% |
+
+With the destination cost kept (`MICE_KEEPDST=1`) the native position is bigger than Mic-E as text: 36.2 B against 32.3 B in the lossless block, 34.2 B with `PACKPOS=2`. So **the whole gain
+is the destination** (6 bytes for a Mic-E latitude against a 1 byte tocall); Mic-E is already a compact way to carry a position. Averaged over the LoRa-gated packets the gain is 0.00 to 0.06 bytes.
+At N=2 the picture is the same (Mic-E only: 31.1 B against 32.0 B as text with the status byte, 29.1 B with `PACKPOS=2`).
+
+**Status in the lossless draft-0 block.** The flags byte is `bits 1-0 data type, 2 timestamp, 3 compressed, 4 course/speed, 5 altitude, 6 (compressed only) course/speed are two spaces`; bit 6 means
+nothing for an uncompressed position, so the cheapest place is: **for an uncompressed position, bit 6 set means a status byte follows the course/speed field** (low 4 bits the status, 0 to 14; the high
+nibble reserved). A position without a status costs nothing extra; one with a status costs 1 byte. In the Mic-E data the status is `En Route` in 92% of the LoRa-gated packets and spread over `In Service`,
+`Off Duty` and `En Route` (about a third each) elsewhere, with 7% custom messages, so a default would not help and the byte is charged always (31.2 B above).
+
+Commands:
+
+    mice_sets.py DIR CAPTURES...                                      # then prep.py as in its docstring
+    mice_check.py TEST.tsv                                            # outcomes and status values; "dump" for a per-packet listing
+    HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tables/tocall_table_v2.txt LAYOUTS=4 PLAINTEXT=1 TOCALL=1 POSNATIVE=1 MICE2NATIVE=1 ./hl TEST.tsv 1 2
+    HOPCALL=KD6DGI-10 NATIVE=1 TOCALLFILE=tables/tocall_table_v2.txt LAYOUTS=4 PLAINTEXT=1 TOCALL=1 PACKPOS=2 MICE2NATIVE=1 ./hl TEST.tsv 1 2
