@@ -15,8 +15,8 @@ add(body + t1 + t2 + bytes([0x83 | 0x40]), 'mask bit 6 set but the path has fewe
 add(body + t1 + t2 + bytes([0x80]), 'mask with no tuple bit (k = 0)')
 add(body + t2 + bytes([0x83]), 'mask names 2 tuples but only one is present')
 add(body + t1 + t2, 'tuples without a mask byte')
-for i, (name, v) in enumerate((('RSSI', 90), ('SNR', 89), ('frequency offset', 90), ('time to hop', 90))):
-    b = bytearray(t2); b[i] = v; add(body + t1 + bytes(b) + bytes([0x83]), '%s byte %d is above its maximum' % (name, v))
+for i, (name, v) in enumerate((('RSSI', 0x80), ('SNR', 0x81), ('frequency offset', 0xC8), ('time to hop', 0xFF))):
+    b = bytearray(t2); b[i] = v; add(body + t1 + bytes(b) + bytes([0x83]), '%s byte 0x%02X is 0x80 or more (it would look like a mask marker)' % (name, v))
 add(f[:3] + bytes([hdr & ~8]) + f[4:], 'RXT bit cleared but the block is still there')
 o = bytes.fromhex(rows[0][0])                    # the frame before the second relay: one tuple; take its origin by dropping the block
 o = o[:3] + bytes([o[3] & ~8]) + o[4:-5]
@@ -29,11 +29,15 @@ add(mut(w, 3, w[3] | 4), 'header bit 2 set (reserved)')
 add(mut(w, 3, w[3] & ~3), 'LACF content with the kind changed to 0 (plain): the payload is not text, the CRC fails')
 add(mut(w, 3, (w[3] & ~3) | 1), 'LACF content with the kind changed to 1 (plain with a position block): the payload is not text, the CRC fails')
 add(mut(w, 3, (w[3] & ~3) | 2), 'kind 2 on a frame with a position block: the position block is read as content, the CRC fails')
-add(mut(w, 9, 62), 'destination code 62 (reserved)')
-add(mut(w, 21, 0x18), 'protocol version 3 is not held')
-add(mut(w, 21, 0x08), 'protocol version 1 (test builds before the plain CRC) is not held')
-add(mut(w, 21, 0x01), 'protocol version 0 (the first test builds, V = 1) is not held')
-add(mut(w, 21, 0x11), 'table version 1 is not held')
+add(mut(w, 9, 126), 'destination code 126 (reserved)')
+add(mut(w, 9, 0x80 | 126), 'destination code 126 with the reserved bit c set')
+add(mut(w, 9, 100), 'destination code 100 is not assigned in the list (the receiver cannot read it)')
+add(mut(w, 21, 0x18), 'model 24 is not held')
+add(mut(w, 21, 0x08), 'model 8 is not held')
+add(mut(w, 21, 0x01), 'model 1 is not held')
+add(mut(w, 21, 0x10), 'a 2.0.0 frame (V = 0x10) reads as model 16, which is not allocated')
+add(mut(w, 21, 0x80), 'capability flag set on a frame that has no capability bytes: the next three bytes are read as capability bytes and the CRC fails')
+add(H.encode(b'N0CALL>APLRG1:>x', cap=b'\x01\x02\x03')[:-3], 'capability flag set and fewer than three bytes after V')
 add(mut(w, 22, 0), 'PPM content with L = 0')
 add(mut(w, 12, 0x80), 'position flags bit 7 set')
 add(mut(w, 12, 0x18), 'position flags: course/speed together with compressed')
@@ -48,7 +52,7 @@ add(w[:4] + bytes([0x9F, 0x59, 0x94, 0xA6, 0x2C, 0x05]) + w[9:], 'SSID extra byt
 add(w[:4] + bytes([0x89, 0x00, 0x00, 0x00, 0x00]) + w[9:], 'callsign element of six spaces (empty)')
 r = H.encode(b'N0CALL>APLRG1:>x')                     # plain content (kind 2, cc = 3)
 def raw_crc(hdr, src_s, dest_s, info):                  # plain content as an encoder that skipped the NUL rule would send it: V, CRC-16 over the whole text, text
-    crc = H.crc16_x25(H.crc_input(hdr, 0x10, src_s, dest_s, info)); return bytes([0x10, crc & 255, crc >> 8]) + info
+    crc = H.crc16_x25(H.crc_input(hdr, 0x00, src_s, dest_s, info)); return bytes([0x00, crc & 255, crc >> 8]) + info
 add(b'\x3c\xff\x02\x00' + H.enc_elem('N0CALL') + b'\x00' + raw_crc(0, 'N0CALL', H.get_destlist(0)[0], b'hi\x00there'), 'NUL byte in plain text (valid CRC)')
 add(r[:-1] + bytes([r[-1] ^ 1]), 'plain content with one text bit flipped (CRC fails)')
 add(r[:-1], 'plain content cut by one byte (CRC fails)')
@@ -59,12 +63,12 @@ def te(b): return bytes([0xC0 | len(b)]) + b                          # a text e
 def rawf(npath, src, dest, path=b'', info=b'hi', names=('N0CALL', 'APLRG1')):    # kind 2, plain content with a valid CRC over the packet an encoder that accepted this element would have meant
     return b'\x3c\xff\x02' + bytes([(npath << 4) | 0]) + src + dest + path + raw_crc((npath << 4) | 0, names[0], names[1], info)
 add(rawf(0, te(b'A:B'), b'\x00', names=('A:B', H.get_destlist(0)[0])), "source text element holds ':' (the decoded packet would split at the wrong colon)")
-add(rawf(0, src6, b'\x3f' + te(b'A,B'), names=('N0CALL', 'A,B')), "destination text element holds ','")
+add(rawf(0, src6, b'\x7f' + te(b'A,B'), names=('N0CALL', 'A,B')), "destination text element holds ','")
 add(rawf(1, src6, b'\x00', te(b'A>B'), names=('N0CALL', H.get_destlist(0)[0])), "path text element holds '>'")
-add(rawf(0, src6, b'\x3f' + te(b'A\x00B'), names=('N0CALL', 'A\x00B')), 'destination text element holds a NUL byte')
+add(rawf(0, src6, b'\x7f' + te(b'A\x00B'), names=('N0CALL', 'A\x00B')), 'destination text element holds a NUL byte')
 orig = H.split_tnc2
 H.split_tnc2 = lambda pkt: ('A:B', 'APLRG1', [], pkt[pkt.index(b':', pkt.index(b'>')) + 1:])     # let the encoder accept the source it refuses
-colon_frame = H._encode(b'A:B>APLRG1:hello world this is a test of the english text', 0)
+colon_frame = H._encode(b'A:B>APLRG1:hello world this is a test of the english text', 0, None)
 H.split_tnc2 = orig
 assert colon_frame is not None
 add(colon_frame, "PPM frame whose source text element holds ':' (what an encoder that accepts such a source would send)")
@@ -74,8 +78,8 @@ pay = H.ppm_encode(infom, txt)
 assert 4 + len(pay) < 3 + len(txt)
 hdr, dst = 2, H.get_destlist(0)[0]
 def ppm_frame(crc_text):
-    crc = H.crc16_x25(H.crc_input(hdr, 0x10, 'N0CALL', dst, crc_text))
-    return b'\x3c\xff\x02' + bytes([hdr]) + src6 + b'\x00' + bytes([0x10, len(txt), crc & 255, crc >> 8]) + pay
+    crc = H.crc16_x25(H.crc_input(hdr, 0x00, 'N0CALL', dst, crc_text))
+    return b'\x3c\xff\x02' + bytes([hdr]) + src6 + b'\x00' + bytes([0x00, len(txt), crc & 255, crc >> 8]) + pay
 add(ppm_frame(txt), 'PPM text holds a NUL byte (CRC over the whole text)')
 add(ppm_frame(b'AB'), 'PPM text holds a NUL byte, with the CRC taken over the text up to the NUL only')
 sys.stdout.write('# Spec 11 rejection vectors: <frame hex> <why it must be dropped>. Every receiver must drop each line.\n' + '\n'.join(out) + '\n')

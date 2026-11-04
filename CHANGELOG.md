@@ -2,9 +2,9 @@
 
 LACF (spec 11) uses semantic versions: MAJOR = wire format version (the low six bits of `V`), MINOR = backward-compatible addition, PATCH = wording only. See "Versions" in `spec/11-native-ppm-frame-byte-plan.md`. The current number is in the file `VERSION`.
 
-## Unreleased - 2.1.0-dev.1, 4 November 2026 (a proposal in the documents only; nothing implemented, not adopted, every change needs F4MLV's agreement)
+## Unreleased - 2.1.0-dev.1, 4 November 2026 (a proposal: not adopted, every change needs F4MLV's agreement)
 
-Documentation only: spec 11, the byte reference, spec 02 and the new `docs/lacf-model-upgrade.md` describe the proposal. `VERSION`, the reference code, the test vectors, the worked example and the pictures are still 2.0.0 and change when the proposal is implemented.
+Spec 11, the byte reference, spec 02, `docs/lacf-model-upgrade.md`, the C reference (`tools/hb/hb.c`), the Python reference (`tools/hb/hb_py`), the test vectors, the worked example and the pictures describe and implement the proposal. `VERSION`, the firmware (iGate, tracker, Pi software), the README notice and the firmware page are still 2.0.0. New vector files: `test/vectors_hb_cap_v1.txt` (capability bytes) and `test/vectors_hb_passthrough_v1.txt` (relay without the model); the other vector files are regenerated. The C and Python references agree on all of them (554 frame vectors, 298 + 199 + 8 relay vectors, 536 capability vectors, 420 pass-through vectors, 47 rejection vectors).
 
 1. **`V = c ss mmmmm`** instead of `vvvvv ttt`: a capability flag, two spare bits and a 5-bit model version (32 models). The protocol version leaves `V`: a change to the front of the frame is a MAJOR change and gets a new frame type byte. Plain frames ignore the model bits.
 2. **Destination byte `c iiiiiii`:** 128 fixed, append-only codes (0 to 125 listed, 126 reserved, 127 the escape), no longer ranked and no longer versioned by `V`; one reserved bit.

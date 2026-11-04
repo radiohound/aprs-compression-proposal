@@ -4,7 +4,7 @@
 >
 > *Last changed 4 November 2026. Released version 2.0.0, see "Versions" below and `CHANGELOG.md`.*
 >
-> **2.1.0-dev.1 (proposal, not adopted).** Where this text says *2.1.0-dev.1* it describes a proposed next format that differs from 2.0.0: the model version replaces the protocol and table versions in `V`; a capability flag in `V` and three capability bytes; a destination byte with 128 fixed, append-only codes; RXT values that are "not measured" or unknown no longer drop a frame; and a relay that does not hold a frame's model still forwards it. **Every one of these changes is proposed and needs F4MLV's agreement.** The test vectors, the worked example and the pictures are still those of 2.0.0 and are regenerated when the change is implemented.
+> **2.1.0-dev.1 (proposal, not adopted).** Where this text says *2.1.0-dev.1* it describes a proposed next format that differs from 2.0.0: the model version replaces the protocol and table versions in `V`; a capability flag in `V` and three capability bytes; a destination byte with 128 fixed, append-only codes; RXT values that are "not measured" or unknown no longer drop a frame; and a relay that does not hold a frame's model still forwards it. **Every one of these changes is proposed and needs F4MLV's agreement.** The C and Python reference codes, the test vectors, the worked example and the pictures follow the proposal (regenerated 4 November 2026). `VERSION`, the firmware (iGate, tracker, Pi software) and the firmware page are still 2.0.0.
 
 | | |
 |---|---|
@@ -263,7 +263,7 @@ If the sender used the destination SSID as a path code, the relay applies the us
 
 ## Conformance (draft)
 
-*The vectors below are those of 2.0.0 (`V = 0x10`, the old destination byte); the proposal 2.1.0-dev.1 changes them, and they are regenerated when it is implemented.* An implementation conforms if, for every line of [`test/vectors_hb_v1.txt`](../test/vectors_hb_v1.txt) (`<frame hex> <TNC2 packet hex>`, 554 fabricated packets, table version 0, which includes destination list 0), the encoder produces exactly that frame from the packet and the receiver accepts the frame and returns exactly that packet;
+*The vectors below are those of the proposal 2.1.0-dev.1 (regenerated 4 November 2026; the 2.0.0 vectors are in the repository history).* Two files are new: [`test/vectors_hb_cap_v1.txt`](../test/vectors_hb_cap_v1.txt) (`<frame hex> <TNC2 packet hex> <capability bytes hex>`: the encoder with the three capability bytes produces the frame, the receiver accepts it and reads the bytes back) and [`test/vectors_hb_passthrough_v1.txt`](../test/vectors_hb_passthrough_v1.txt) (`<received frame hex> <pass-through relayed frame hex> <relay that decodes, hex or ->`: a frame whose model or destination code the relay does not hold is forwarded by "Relay without the model" and not by the relay that decodes). An implementation conforms if, for every line of [`test/vectors_hb_v1.txt`](../test/vectors_hb_v1.txt) (`<frame hex> <TNC2 packet hex>`, 554 fabricated packets, model version 0, which includes destination list set 1), the encoder produces exactly that frame from the packet and the receiver accepts the frame and returns exactly that packet;
 for [`test/vectors_hb_relay_v1.txt`](../test/vectors_hb_relay_v1.txt) and [`test/vectors_hb_relay_chain_v1.txt`](../test/vectors_hb_relay_chain_v1.txt) (`<received frame> <relayed frame> <relayed packet>`; first hop, and second and later hops of frames that already carry tuples), the relay produces the relayed frame and the receiver accepts it and returns the relayed packet;
 for [`test/vectors_hb_relay_edge_v1.txt`](../test/vectors_hb_relay_edge_v1.txt) (the same columns; a relayed frame of `-` means the relay must **not** relay that frame): the source and destination bytes copied as received, a listed destination in escape form, seven tuples already in the frame with the relay at the eighth element, tuples on unused elements, and a long packet (relayed without the relay's own tuple when the tuple would make it longer than 255 bytes, not relayed when it is too long even without it);
 and every frame of [`test/vectors_hb_reject_v1.txt`](../test/vectors_hb_reject_v1.txt) (`<frame hex> <why>`: impossible RXT blocks, headers, versions and address elements, text elements holding `:`, `,`, `>` or NUL, and PPM text holding a NUL) is dropped. The edge cases of the list above (WIDE look-alikes, SSIDs 0 to 255, text elements with a star, empty and over-long elements, 15 and 16 path elements, frames at the 255-byte limit, malformed positions, altitude forms, the relay with an eighth element) are in [`test/hb_edge_packets.txt`](../test/hb_edge_packets.txt), part of the 554 vectors. A worked example follows this section. An independent Python implementation, written from this text before these rules were completed, and the C reference agree on all vectors and on 142,282 intact and damaged frames. The C reference is [`tools/hb/`](../tools/hb/) (`make hb-test`); the fabricated packets come from `tools/hb/gen_packets.py`.
@@ -324,21 +324,21 @@ One packet, as the origin sends it and after two relay hops. All bytes are hexad
 | `00` | position flags | `!` (data type 0), no timestamp, uncompressed, no course/speed, no altitude |
 | `01 B5 F8 16 55 EB` | position | latitude 37°22.40' N as hundredths of a minute times 2 plus 0 (N), 22 bits, then longitude 121°58.93' W times 2 plus 1 (W), 22 bits (`(224240 × 2) << 22 | (731893 × 2 + 1)`) |
 | `2F 3E` | symbol | table `/`, symbol `>` |
-| `10` | `V` | `00010 000`: protocol version 2, table version 0 |
+| `00` | `V` | `0 00 00000`: no capability bytes (`c` = 0), spare bits 0, model version 0 |
 | `1B` | `L` | 27 characters of comment |
-| `B1 A6` | CRC-16/X-25 | `0xA6B1`, low byte first, over `03 10` + `N0CALL-9` + `>` + `APLRG1` + `:` + the information field |
+| `F8 CC` | CRC-16/X-25 | `0xCCF8`, low byte first, over `03 00` + `N0CALL-9` + `>` + `APLRG1` + `:` + the information field |
 | `93 AF 55 0A 8E 18 E2 07 49 5B` | payload | the 27 comment characters in 10 bytes (the comment-only table, because the position is in the native block) |
 
 The text is 79 bytes plus the 3-byte prefix; the frame is 35 bytes.
 
-**After the first relay (`N0RLY-1`, tuple 50 20 45 10), 44 bytes:** `3CFF022B895994A62C00A159A392E8120001B5F81655EB2F3E101BB1A693AF550A8E18E207495B32142D0A81`
+**After the first relay (`N0RLY-1`, tuple 50 20 45 10), 44 bytes:** `3CFF022B895994A62C00A159A392E8120001B5F81655EB2F3E001BF8CC93AF550A8E18E207495B32142D0A81`
 
 * header `23` becomes `2B` (RXT bit set);
 * path 0 `09` (`WIDE1-1`) becomes `A1 59 A3 92 E8`: callsign element, `1 0 1 00001`, the used mark `*` and SSID 1, then `N0RLY` in base 40 (the path is now `N0RLY-1*,WIDE2-2`; path 1, `12`, is unchanged);
 * the position block and the content field (`00 ... 5B`) are copied byte for byte;
 * the RXT block is added at the end: `32 14 2D 0A` is the tuple (RSSI 50, SNR 20, frequency offset 45, time to hop 10), then the mask `81` = marker bit 7 and bit 0: one tuple, for path element 0.
 
-**After the second relay (`N0RLY-2`, tuple 51 21 46 11), 53 bytes:** `3CFF023B895994A62C00A159A392E8A259A392E8110001B5F81655EB2F3E101BB1A693AF550A8E18E207495B32142D0A33152E0B83`
+**After the second relay (`N0RLY-2`, tuple 51 21 46 11), 53 bytes:** `3CFF023B895994A62C00A159A392E8A259A392E8110001B5F81655EB2F3E001BF8CC93AF550A8E18E207495B32142D0A33152E0B83`
 
 * header `2B` becomes `3B` (3 path elements);
 * the first unused element is `WIDE2-2`: it becomes `A2 59 A3 92 E8` (`N0RLY-2*`) followed by `11` (`WIDE2-1`), so the path is `N0RLY-1*,N0RLY-2*,WIDE2-1`;

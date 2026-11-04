@@ -151,7 +151,7 @@ The protocol version is no longer a field: a change to the front of the frame is
 
 **The CRC** is CRC-16/X-25 (polynomial 0x1021 reflected, initial value 0xFFFF, result inverted). It is computed over, in this order: the header byte AND 0x07 (the reserved bit and the kind bits), V, the source as text, `>`, the destination as text, `:`, and the information field. It does not cover the path or the path count and RXT flag, which relays change, so a relay never recomputes it. A receiver that has the wrong table set, or a damaged source, destination or V, fails it.
 
-In the example `B1 A6` is the CRC `0xA6B1`, `10` is V (protocol version 2, table version 0) and `1B` is L = 27, the length of `LoRa APRS iGate on the hill`.
+In the example `F8 CC` is the CRC `0xCCF8`, `00` is V (no capability bytes, model version 0) and `1B` is L = 27, the length of `LoRa APRS iGate on the hill`.
 
 **The payload** is the range-coder output of spec 01, which codes each character by how likely it is after the three before it, using the table version. The sender ends the payload in a fixed way (the "deterministic ending", on average 0.25 B more) so that a receiver can check it: it decodes, codes the text again, and **drops the frame unless the result matches the payload byte for byte**. A cut or damaged payload almost never survives that. The example's payload is the 10 bytes `93 AF 55 0A 8E 18 E2 07 49 5B`, which stand for the 27 characters.
 

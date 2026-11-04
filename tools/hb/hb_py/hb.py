@@ -857,10 +857,14 @@ def main(argv):
         n = r = dd = 0
         for ln in _lines(_read(argv[2])):
             a, b, c = ln.split()
-            a, b, c = (bytes.fromhex(x.decode()) for x in (a, b, c))
             n += 1
-            ok_r = relay_auto(a) == b
-            ok_d = decode(b) == c
+            if b == b'-':                                   # the relay must NOT relay this frame
+                ok_r = relay_auto(bytes.fromhex(a.decode())) is None
+                ok_d = True
+            else:
+                a, b, c = (bytes.fromhex(x.decode()) for x in (a, b, c))
+                ok_r = relay_auto(a) == b
+                ok_d = decode(b) == c
             r += ok_r
             dd += ok_d
             if not (ok_r and ok_d):

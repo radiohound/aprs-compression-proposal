@@ -6,6 +6,8 @@
  *   hb_test relaycheck FILE             check a relay vector file against hb_relay
  *   hb_test relaytocheck FILE           the same file through hb_relay_to, with the relayed path taken from the file
  *   hb_test relaygen  < packets.txt     for each packet with an unused WIDE1-1 or WIDE2-2: "<frame hex> <relayed frame hex> <relayed tnc2 hex>"
+ *   hb_test capcheck FILE               "<frame hex> <tnc2 hex> <capability hex>": encode with the three capability bytes, decode, and the bytes read back
+ *   hb_test passcheck FILE              "<received hex> <pass-through relayed hex or -> <normal relay hex or ->": first-hop relay N0RLY-1; the pass-through relay and the relay that decodes
  *   hb_test props packets.txt           cuts, appended bytes, bit flips, RXT, relay: what is accepted that should not be
  *   hb_test time packets.txt            encode and decode time on this machine */
 #include "hb.h"
@@ -39,7 +41,7 @@ int main(int argc, char **argv)
 
     if (!strcmp(argv[1], "gen")) {
         n = read_lines(NULL, lines, 20000);
-        printf("# Spec 11 test vectors: <frame hex> <TNC2 packet hex>. Protocol version 2, table version 0 (V = 00010 000), destination list set 1. '-' = not encodable (a plain frame is sent).\n");
+        printf("# Spec 11 test vectors: <frame hex> <TNC2 packet hex>. Proposal 2.1.0-dev.1: model version 0 (V = 0x00), destination list set 1 (fixed codes). '-' = not encodable (a plain frame is sent).\n");
         for (i = 0; i < n; i++) { size_t w = hb_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); if (w) hexout(fr, w); else fputs("-", stdout); putchar(' '); hexout((uint8_t *)lines[i], strlen(lines[i])); putchar('\n'); }
         return 0;
     }
@@ -148,6 +150,40 @@ int main(int argc, char **argv)
             hexout(fr, w); putchar(' '); hexout(out, r); putchar(' '); if (d > 0) hexout((uint8_t *)tn, (size_t)d); else fputs("-", stdout); putchar('\n');
         }
         return 0;
+    }
+    if (!strcmp(argv[1], "capcheck") && argc > 2) {
+        FILE *f = fopen(argv[2], "r"); char l[3000]; int cnt = 0, bad = 0;
+        if (!f) { perror(argv[2]); return 2; }
+        while (fgets(l, sizeof l, f)) {
+            char *a, *b; uint8_t want[400], txt[800], cap3[8]; size_t wl, tl; hb_info_t in; size_t w; int r;
+            if (l[0] == '#' || l[0] == '\n') continue;
+            a = strchr(l, ' '); if (!a) continue; *a++ = 0; b = strchr(a, ' '); if (!b) continue; *b++ = 0;
+            wl = unhex(l, want, sizeof want); tl = unhex(a, txt, sizeof txt); txt[tl] = 0; unhex(b, cap3, sizeof cap3); cnt++;
+            w = hb_encode_cap((char *)txt, tl, NULL, cap3, fr, sizeof fr, &in);
+            if (w != wl || memcmp(fr, want, wl)) { bad++; printf("capability vector %d: encode mismatch\n", cnt); continue; }
+            r = hb_decode(want, wl, tn, sizeof tn, &in);
+            if (r != (int)tl || memcmp(tn, txt, tl) || !in.has_cap || memcmp(in.cap, cap3, 3)) { bad++; printf("capability vector %d: decode %s\n", cnt, r < 0 ? hb_reason(r) : "mismatch"); }
+        }
+        fclose(f);
+        printf("%d capability vectors, %d failed\n", cnt, bad);
+        return bad != 0;
+    }
+    if (!strcmp(argv[1], "passcheck") && argc > 2) {
+        FILE *f = fopen(argv[2], "r"); char l[3000]; int cnt = 0, bad = 0;
+        if (!f) { perror(argv[2]); return 2; }
+        while (fgets(l, sizeof l, f)) {
+            char *a, *b; uint8_t rx[400], pw[400], nw[400], o[400]; size_t rl, pl = 0, nl = 0, w;
+            if (l[0] == '#' || l[0] == '\n') continue;
+            a = strchr(l, ' '); if (!a) continue; *a++ = 0; b = strchr(a, ' '); if (!b) continue; *b++ = 0;
+            rl = unhex(l, rx, sizeof rx); if (a[0] != '-') pl = unhex(a, pw, sizeof pw); if (b[0] != '-') nl = unhex(b, nw, sizeof nw); cnt++;
+            w = hb_relay_passthrough(rx, rl, "N0RLY-1", TUP, o, sizeof o);
+            if (w != pl || (pl && memcmp(o, pw, pl))) { bad++; printf("pass-through vector %d: relay mismatch\n", cnt); continue; }
+            w = hb_relay(rx, rl, "N0RLY-1", TUP, o, sizeof o);
+            if (w != nl || (nl && memcmp(o, nw, nl))) { bad++; printf("pass-through vector %d: the relay that decodes differs\n", cnt); }
+        }
+        fclose(f);
+        printf("%d pass-through vectors, %d failed\n", cnt, bad);
+        return bad != 0;
     }
     if (!strcmp(argv[1], "props") && argc > 2) {
         /* counters by content type: [0] PPM content (cc = 0), [1] plain content (cc = 1) */
