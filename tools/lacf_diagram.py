@@ -42,7 +42,7 @@ add('<title id="t">LACF frame layout</title>')
 add('<desc id="d">The fields of a LACF frame (LoRa APRS Compact Frame, spec 11 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>')
 rect(0, 0, W, 0, "#ffffff", stroke="#ffffff", rx=0)
 text(30, 38, "LACF frame layout", 24, "bold")
-text(30, 60, "LoRa APRS Compact Frame, spec 11 draft. A draft in early development; the format may change. Sizes are in bytes.", 13, fill=MUTED)
+text(30, 60, "LoRa APRS Compact Frame, spec 11 draft, proposal 2.1.0-dev.1 (not adopted). A draft in early development; the format may change. Sizes are in bytes.", 13, fill=MUTED)
 
 # ---------------------------------------------------------------- A. the fields
 text(30, 100, "1. The fields, in the order they are sent", 16, "bold")
@@ -50,7 +50,7 @@ fields = [
     ("Marker", "3 B", "3C FF 02", "marker", 104, ["Says this is a native frame. Other firmware ignores it."]),
     ("Header", "1 B", "bit by bit below", "header", 92, ["Number of path elements, RXT flag, form (LACF or plain), position block."]),
     ("Source", "5 B", "callsign + SSID", "source", 108, ["The sender, packed into 5 bytes; unusual names go as text."]),
-    ("Destination", "1 B", "table code", "dest", 110, ["Which device or software sent it (a list of 62); 1 + 5 B if not listed."]),
+    ("Destination", "1 B", "table code", "dest", 110, ["Which device or software sent it (a fixed list, codes 0 to 125); 1 + 5 B if not listed."]),
     ("Path", "1 B each", "or 5 B", "path", 112, ["One byte for WIDE1-1, WIDE2-2 and so on; 5 bytes for a callsign."]),
     ("Position", "9 B", "kinds 1 and 3", "pos", 100, ["Latitude, longitude and symbol, exact (lossless)."]),
     ("Content", "V L CRC + n", "", "vlc", 222, []),
@@ -72,7 +72,7 @@ for name, size, sub, key, w, notes in fields:
             text(px + pw / 2, y0 + 46, sz, 11, fill=MUTED, anchor="middle")
             px += pw
         text(x + w / 2, y0 - 6, "Content field", 13, "bold", anchor="middle")
-        wr = textwrap.wrap("The text of the packet (or the comment after a position), coded by PPM. V = protocol and table version, L = length, CRC-16 over the text and addresses.", int(w / 6.1))
+        wr = textwrap.wrap("The text of the packet (or the comment after a position), coded by PPM. V = capability flag and model version, L = length, CRC-16 over the text and addresses.", int(w / 6.1))
         maxlines = max(maxlines, len(wr))
         for i, s_ in enumerate(wr):
             text(x + w / 2, y0 + bh + 18 + 14 * i, s_, 11, fill=MUTED, anchor="middle")
@@ -106,7 +106,7 @@ def bits(x, y, spec, title):
         cx += w + 3
     return cx
 bits(30, yb + 28, [("7-4", 4, ["path elements", "(0 to 15)"], C["path"]), ("3", 1, ["RXT", "follows"], C["tuple"]), ("2", 1, ["reserved", "= 0"], "#eeeeee"), ("1-0", 2, ["kind: bit 1 = form", "(1 LACF, 0 plain);", "bit 0 = position block"], C["header"])], "Header byte")
-bits(580, yb + 28, [("vvvvv", 5, ["protocol version", "(2 today)"], C["vlc"]), ("ttt", 3, ["table version", "(0 today)"], C["payload"])], "V, the first byte of the content field")
+bits(580, yb + 28, [("c", 1, ["capability", "bytes follow"], "#eeeeee"), ("ss", 2, ["spare", "= 0"], "#eeeeee"), ("mmmmm", 5, ["model version", "(0 today)"], C["payload"])], "V, the first byte of the content field")
 add_y = yb + 28 + 124
 text(30, add_y, "RXT tuple (4 bytes per relay, then one mask byte at the very end):", 13, "bold")
 tx = 30
@@ -114,8 +114,21 @@ for lbl, note in [("RSSI", "signal strength"), ("SNR", "signal to noise"), ("fre
     rect(tx, add_y + 10, 110, 34, C["tuple"]); text(tx + 55, add_y + 32, lbl, 12, "bold", anchor="middle"); text(tx + 55, add_y + 58, note, 11, fill=MUTED, anchor="middle"); tx += 113
 rect(tx + 6, add_y + 10, 150, 34, C["mask"]); text(tx + 81, add_y + 32, "mask", 12, "bold", anchor="middle"); text(tx + 81, add_y + 58, "bit 7 set; bits 0 to 6 name", 11, fill=MUTED, anchor="middle"); text(tx + 81, add_y + 72, "the path elements measured", 11, fill=MUTED, anchor="middle")
 
+# ---------------------------------------------------------------- B2. capability bytes (proposal 2.1.0-dev.1)
+cap_y = add_y + 112
+text(30, cap_y, "Capability bytes (3 bytes after V, only when V bit 7 is set; 24 bits, bit 23 first, sent about every 8th beacon):", 13, "bold")
+cx = 30
+CU = 42
+for lbl, n_, note in [("role", 3, ["transmit only,", "listens, digi,", "late tiers, iGate"]), ("model", 5, ["newest model", "the station", "decodes"]), ("SF", 3, ["SF5 to", "SF12"]), ("BW", 2, ["62.5 to", "500 kHz"]),
+                      ("CR", 2, ["4/5 to", "4/8"]), ("power", 4, ["0 unknown,", "else 2n+3 dBm", "(5 to 33)"]), ("preset", 5, ["channel: 433.775,", "439.9125 (UK),", "434.855 (PL), ..."])]:
+    w_ = CU * n_
+    rect(cx, cap_y + 10, w_, 34, C["vlc"]); text(cx + w_ / 2, cap_y + 32, "%s %d" % (lbl, n_), 12, "bold", anchor="middle")
+    for k_, ln_ in enumerate(note):
+        text(cx + w_ / 2, cap_y + 58 + 13 * k_, ln_, 11, fill=MUTED, anchor="middle")
+    cx += w_ + 3
+
 # ---------------------------------------------------------------- C. worked example
-yc = add_y + 134          # room below the RXT tuple notes, so section 3 does not crowd them
+yc = cap_y + 124          # room below the capability notes, so section 3 does not crowd them
 text(30, yc, "3. A worked example: one position beacon", 16, "bold")
 text(30, yc + 24, PKT.decode(), 12, family=MONO)
 text(30, yc + 42, "As an ordinary LoRa APRS frame that is 3 + 79 = 82 bytes of text.", 12, fill=MUTED)
@@ -154,7 +167,7 @@ def cells(y, data, groups, caption):
 g1 = [
     (0, 3, "marker 3C FF 02", None, None), (3, 4, "header 23: 2 path elements, kind 3", None, None), (4, 9, "source N0CALL-9", None, None),
     (9, 10, "destination code 0 = APLRG1", None, None), (10, 12, "path: WIDE1-1, WIDE2-2", None, None),
-    (12, 21, "position block: ! 37°22.40'N 121°58.93'W, symbol >", None, None), (21, 25, "V = 10 (protocol 2, table 0), L = 27 characters, CRC-16", None, None),
+    (12, 21, "position block: ! 37°22.40'N 121°58.93'W, symbol >", None, None), (21, 25, "V = 00 (model 0, no capability bytes), L = 27 characters, CRC-16", None, None),
     (25, 35, "PPM payload = \"LoRa APRS iGate on the hill\"", None, None)]
 cols1 = [C["marker"], C["header"], C["source"], C["dest"], C["path"], C["pos"], C["vlc"], C["payload"]]
 g1 = [(a, b, l, cols1[i]) for i, (a, b, l, _, _) in enumerate(g1)]

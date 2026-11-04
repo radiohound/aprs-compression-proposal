@@ -1,6 +1,6 @@
 # What a LACF frame looks like
 
-LACF (LoRa APRS Compact Frame, [spec 11](../spec/11-native-ppm-frame-byte-plan.md)) is a draft in early development, and the format may change. This page shows the layout once as a picture and once as tables, then follows one real packet byte by byte.
+LACF (LoRa APRS Compact Frame, [spec 11](../spec/11-native-ppm-frame-byte-plan.md)) is a draft in early development, and the format may change. **This page shows the proposal 2.1.0-dev.1 (not adopted; every change needs F4MLV's agreement); where 2.0.0 differs, the byte reference says so.** This page shows the layout once as a picture and once as tables, then follows one real packet byte by byte.
 
 ![The fields of a LACF frame, the header and V bytes, the RXT block, and a worked example of 35 bytes, and 44 bytes after one relay hop](img/lacf-frame-layout.svg)
 
@@ -13,13 +13,13 @@ Every byte and bit in the picture is defined, with its values and what it does, 
 | Marker | 3 B | `3C FF 02`: the native frame. Firmware that does not know it ignores the frame. |
 | Header | 1 B | Bits 7-4: number of path elements (0 to 15). Bit 3: an RXT block follows. Bit 2: reserved, 0. Bit 1: the form (1 = LACF, PPM-coded content; 0 = plain text with a CRC). Bit 0: 1 = a position block follows the path, 0 = none. So kind 0 = plain, 1 = plain with a position block, 2 = LACF, 3 = LACF with a position block. |
 | Source | 5 B | The sender's callsign and SSID, packed. A name that does not fit goes as a text element. |
-| Destination | 1 B | A code from a list of 62 (which device or software sent the packet). 1 + 5 B when the destination is not in the list. |
+| Destination | 1 B | A code from a fixed, append-only list (which device or software sent the packet): codes 0 to 125, 126 reserved, 127 = the escape. 1 + 5 B when the destination is not in the list. |
 | Path | 1 B each, or 5 B | One byte for `WIDEn-N`; 5 bytes for a callsign. A path that breaks the APRS `WIDEn-N` rule is not carried. |
 | Position block | 9 B typical | Kinds 1 and 3 only: data type, latitude, longitude, table and symbol, exactly. Longer with a timestamp, course or altitude. |
 | Content field | LACF: 4 B + n; plain: 3 B + the text | LACF content (kinds 2 and 3): `V` (1 B), `L` (1 B), CRC-16 (2 B), then the PPM payload (n B). Plain content (kinds 0 and 1): `V` (1 B), CRC-16 (2 B), then the text itself. The encoder uses plain content when LACF would not make the frame shorter. |
 | RXT block | 4 B per hop + 1 | Added by relays only: one tuple per relay (RSSI, SNR, frequency offset, time to hop), then a mask byte. |
 
-`V` is five bits of protocol version (2 today) and three bits of table version (0 today); the table version names the destination list and the LACF tables together. Whether the content is LACF or plain is in the header, not in `V`. The CRC-16 covers the text, the kind bits, `V` and the source and destination, but not the path, which relays change.
+`V` is `c ss mmmmm`: `c` says that three capability bytes follow `V` (sent on some beacons), `ss` are two spare bits, and `mmmmm` is the model version (the pair of PPM tables; 0 today). Whether the content is LACF or plain is in the header, not in `V`. The CRC-16 covers the text, the kind bits, `V` and the source and destination, but not the path, which relays change.
 
 ## The worked example
 
@@ -38,9 +38,9 @@ As a LACF frame (35 bytes, 57% smaller for this packet; the average on real pack
 | `09` | path element | `WIDE1-1` |
 | `12` | path element | `WIDE2-2` |
 | `00 01 B5 F8 16 55 EB 2F 3E` | position block | data type `!`, 37°22.40'N, table `/`, 121°58.93'W, symbol `>` |
-| `10` | V | protocol version 2 (`00010`), table version 0 (`000`) |
+| `00` | V | `c` = 0 (no capability bytes), `ss` = 0, model version 0 (`00000`) |
 | `1B` | L | 27 characters of text follow in coded form |
-| `B3 E0` | CRC-16 | `0xE0B3`, low byte first |
+| `F8 CC` | CRC-16 | `0xCCF8`, low byte first (V is part of the CRC input) |
 | `93 AF 55 0A 8E 18 E2 07 49 5B` | PPM payload | `LoRa APRS iGate on the hill` in 10 bytes |
 
 After one relay hop (44 bytes): the relay changes the front of the frame and copies everything else byte for byte.

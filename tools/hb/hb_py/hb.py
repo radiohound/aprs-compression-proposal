@@ -18,14 +18,15 @@ INFO_MODEL_PATH = os.path.join(TABLE_DIR, 'model_hybridB_info_native.c')
 COMMENT_MODEL_PATH = os.path.join(TABLE_DIR, 'model_hybridB_comment.c')
 DEST_LIST_PATH = os.path.join(TABLE_DIR, 'tocall_set1.txt')
 
-# Versions. SPEC_VERSION is the semantic version of spec 11. MAJOR = the protocol version, the top five bits of V (WIRE_VERSION); MINOR = a backward-compatible
-# addition; PATCH = wording only. The low three bits of V are the table version (tocall list and PPM tables together; table 0 is the first). Protocol 2: plain
-# content carries a CRC-16 and the plain/LACF form is kind bit 1; protocol 0 and 1 were only ever in test builds and are dropped.
-SPEC_VERSION = '2.0.0'
-WIRE_VERSION = 2
-TABLE_VERSION = 0
-KNOWN_TABLES = (0,)
-def make_v(proto=WIRE_VERSION, table=TABLE_VERSION): return (proto << 3) | table
+# Versions. SPEC_VERSION is the semantic version of spec 11; this file implements the proposal 2.1.0-dev.1 (not adopted, needs F4MLV's agreement).
+# V = c ss mmmmm: c = three capability bytes follow V, ss two spare bits (sent 0, ignored), mmmmm the model version (the pair of PPM tables, 32 values).
+# The protocol version is no longer in V (a change to the front of the frame is a new type byte), and the destination list is not versioned.
+# Models 16 to 23 stay unallocated until adoption: a 2.0.0 build reads V = 0x10 to 0x17 as protocol 2.
+SPEC_VERSION = '2.1.0-dev.1'
+MODEL_VERSION = 0
+KNOWN_MODELS = (0,)
+KNOWN_TABLES = KNOWN_MODELS                  # the old name, kept for the callers that still use it
+def make_v(model=MODEL_VERSION, cap=False, ss=0): return (0x80 if cap else 0) | ((ss & 3) << 5) | (model & 31)
 RELAY_CALL = 'N0RLY-1'
 RELAY_TUPLE = bytes([50, 20, 45, 10])  # decimal: the spec writes "50 20 45 10"
 TUPLE_MAX = (89, 88, 89, 89)
@@ -182,16 +183,15 @@ _destlist = {}
 
 
 def get_models(version):
-    if version not in KNOWN_TABLES:
-        raise Drop('unknown_version')
+    if version not in KNOWN_MODELS:
+        raise Drop('unknown_model')
     if version not in _models:
         _models[version] = (Model(INFO_MODEL_PATH), Model(COMMENT_MODEL_PATH))
     return _models[version]
 
 
-def get_destlist(version):
-    if version not in KNOWN_TABLES:
-        raise Drop('unknown_version')
+def get_destlist(version=0):
+    version = 0                                 # the list is fixed and append-only: not versioned in V
     if version not in _destlist:
         d = {}
         with open(DEST_LIST_PATH, encoding='latin-1') as fh:
@@ -453,11 +453,11 @@ def _parse(frame):
     dest_codeless = None
     if p >= len(f):
         raise Drop('truncated')
-    code = f[p] & 63
+    code = f[p] & 127                       # bit 7 (c) is reserved and ignored
     p += 1
-    if code == 62:
+    if code == 126:
         raise Drop('reserved_dest_code')
-    if code == 63:
+    if code == 127:
         dest, p = dec_elem(f, p)
     else:
         dest_codeless = code
@@ -501,13 +501,13 @@ def _parse(frame):
         # "at least 4k+1 bytes remain after the position block and after V (plain: V and the CRC, 3 bytes; LACF: V, L and the CRC, 4 bytes)"
         if cstart >= len(f):
             raise Drop('truncated')
-        minstart = cstart + (3 if plain else 4)
+        minstart = cstart + (3 if plain else 4) + (3 if f[cstart] & 0x80 else 0)
         if end - minstart < 4 * k + 1:
             raise Drop('rxt_truncated')
         blk = f[end - 4 * k - 1:end - 1]
         for i in range(k):
             for fld in range(4):
-                if blk[4 * i + fld] > TUPLE_MAX[fld]:
+                if blk[4 * i + fld] >= 0x80:      # 90 to 127 are unknown values (93 = not measured) and the frame is kept
                     raise Drop('rxt_out_of_range')
         tuples = [(bits[i], blk[4 * i:4 * i + 4]) for i in range(k)]
         end = end - 4 * k - 1
@@ -535,17 +535,20 @@ def _decode(frame):
     if p >= end:
         raise Drop('truncated')
     V = f[p]
-    proto, ver = V >> 3, V & 7
-    if proto != WIRE_VERSION:
-        raise Drop('unknown_version')
-    infom, comm = get_models(ver)
+    model_v = V & 31
     dest = d['dest']
     if dest is None:
-        dl = get_destlist(ver)
+        dl = get_destlist()
         if d['dest_code'] not in dl:
             raise Drop('dest_code_unknown')
         dest = dl[d['dest_code']]
     p += 1
+    cap = b''
+    if V & 0x80:                                     # three capability bytes follow V; advisory, never a reason to drop except when they are missing
+        if p + 3 > end:
+            raise Drop('truncated')
+        cap = f[p:p + 3]
+        p += 3
     if d['plain']:
         if p + 2 > end:
             raise Drop('truncated')
@@ -555,9 +558,10 @@ def _decode(frame):
             info = rebuild_info(d['pfx'], d['alt_off'], d['alt_text'], text)
         else:
             info = text
-        if crc16_x25(crc_input(d['header'], V, d['src'], dest, info)) != crc:
+        if crc16_x25(crc_input(d['header'], V, d['src'], dest, info, cap)) != crc:
             raise Drop('crc')
-        return _tnc2(d['src'], dest, d['path'], info)
+        return _tnc2(d['src'], dest, d['path'], info)       # plain content uses no model: the model bits are ignored
+    infom, comm = get_models(model_v)                 # LACF content: drop unless the model is held
     if p + 3 > end:
         raise Drop('truncated')
     L = f[p]
@@ -571,7 +575,7 @@ def _decode(frame):
         info = rebuild_info(d['pfx'], d['alt_off'], d['alt_text'], text)
     else:
         info = text
-    if crc16_x25(crc_input(d['header'], V, d['src'], dest, info)) != crc:
+    if crc16_x25(crc_input(d['header'], V, d['src'], dest, info, cap)) != crc:
         raise Drop('crc')
     if ppm_encode(model, text) != payload:
         raise Drop('not_canonical')
@@ -580,8 +584,8 @@ def _decode(frame):
     return _tnc2(d['src'], dest, d['path'], info)
 
 
-def crc_input(header, V, src, dest, info):
-    return (bytes([header & 7, V]) + src.encode('latin-1') + b'>' + dest.encode('latin-1')
+def crc_input(header, V, src, dest, info, cap=b''):
+    return (bytes([header & 7, V]) + cap + src.encode('latin-1') + b'>' + dest.encode('latin-1')
             + b':' + info)
 
 
@@ -626,9 +630,12 @@ def path_ok(tnc2):
     return sp is None or all(wide_ok(t) for t in sp[2])
 
 
-def encode(tnc2, version=TABLE_VERSION):
+def encode(tnc2, version=MODEL_VERSION, cap=None):
+    """version is the model version; cap is None or the three capability bytes (bytes or a 24-bit int)."""
+    if isinstance(cap, int):
+        cap = cap.to_bytes(3, 'big')
     try:
-        fr = _encode(bytes(tnc2), version)
+        fr = _encode(bytes(tnc2), version, cap)
     except (Drop, OverflowError):
         return None
     if fr is None or len(fr) > 255:
@@ -638,7 +645,7 @@ def encode(tnc2, version=TABLE_VERSION):
     return fr
 
 
-def _encode(pkt, version):
+def _encode(pkt, version, cap=None):
     sp = split_tnc2(pkt)
     if sp is None:
         return None
@@ -656,19 +663,19 @@ def _encode(pkt, version):
         if e is None:
             return None
         pe.append(e)
-    dl = get_destlist(version)
+    dl = get_destlist()
     code = None
     for c, name in dl.items():
         if name == dest:
             code = c
             break
-    if code is not None and c < 62:
+    if code is not None and code < 126:
         de = bytes([code])
     else:
         e = enc_elem(dest)
         if e is None:
             return None
-        de = b'\x3f' + e
+        de = b'\x7f' + e
     infom, comm = get_models(version)
     bp = build_pos(info)
     kind, block, text, model = 2, b'', info, infom
@@ -684,25 +691,28 @@ def _encode(pkt, version):
         payload = ppm_encode(model, text)
         if 4 + len(payload) < 3 + L:                 # plain content is V, CRC-16 and the text: 3 + L bytes
             ppm = payload
-    V = make_v(WIRE_VERSION, version)
+    V = make_v(version, cap is not None)
+    capb = cap if cap is not None else b''
     if ppm is not None:                              # LACF content: kind 2 (whole information field) or 3 (position block + comment)
         header = (len(path) << 4) | kind
-        crc = crc16_x25(crc_input(header, V, src, dest, info))
-        content = bytes([V, L, crc & 255, crc >> 8]) + ppm
+        crc = crc16_x25(crc_input(header, V, src, dest, info, capb))
+        content = bytes([V]) + capb + bytes([L, crc & 255, crc >> 8]) + ppm
     else:                                            # plain content: kind 0 or 1 (the same two with the LACF flag clear)
         header = (len(path) << 4) | (kind - 2)
-        crc = crc16_x25(crc_input(header, V, src, dest, info))
-        content = bytes([V, crc & 255, crc >> 8]) + text
+        crc = crc16_x25(crc_input(header, V, src, dest, info, capb))
+        content = bytes([V]) + capb + bytes([crc & 255, crc >> 8]) + text
     return b'\x3c\xff\x02' + bytes([header]) + se + de + b''.join(pe) + block + content
 
 
 # ---------------------------------------------------------------- relay
 
-def relay(frame, relay_call=RELAY_CALL, tuple_bytes=RELAY_TUPLE):
-    """Relay a received frame (spec 11 Relay and Conformance). Returns the new frame or None."""
+def relay(frame, relay_call=RELAY_CALL, tuple_bytes=RELAY_TUPLE, passthrough=False):
+    """Relay a received frame (spec 11 Relay and Conformance). Returns the new frame or None.
+    passthrough=True is 'Relay without the model': every structural check is kept, but the content is not decoded, so a frame
+    whose model or destination code the relay does not hold is forwarded, with its content field copied byte for byte."""
     try:
         d = _parse(frame)
-        if not isinstance(_decode_ok(frame), bytes):
+        if not passthrough and not isinstance(_decode_ok(frame), bytes):
             return None
     except Drop:
         return None
@@ -748,6 +758,10 @@ def relay(frame, relay_call=RELAY_CALL, tuple_bytes=RELAY_TUPLE):
     return out if len(out) <= 255 else None
 
 
+def relay_passthrough(frame, relay_call=RELAY_CALL, tuple_bytes=RELAY_TUPLE):
+    return relay(frame, relay_call, tuple_bytes, passthrough=True)
+
+
 def relay_auto(frame):
     """The relay of the conformance vectors: callsign N0RLY-(k+1) and tuple 50+k 20+k 45+k 10+k, k = tuples already in the frame."""
     try:
@@ -760,6 +774,32 @@ def relay_auto(frame):
 def _decode_ok(frame):
     r = decode(frame)
     return r
+
+
+# ---------------------------------------------------------------- capability bytes
+
+ROLES = ('transmit_only', 'listens', 'digipeater', 'digipeater_late', 'igate', 'igate_digipeater', 'igate_digipeater_late', 'reserved')
+_CAP_FIELDS = (('role', 3), ('model', 5), ('sf', 3), ('bw', 2), ('cr', 2), ('power', 4), ('preset', 5))     # bit 23 first; 24 bits in all
+
+
+def pack_capability(role, model, sf, bw, cr, power, preset):
+    """The three capability bytes (spec 11, 'Capability bytes'). sf 0..7 = SF5..SF12, bw 0..3 = 62.5/125/250/500 kHz, cr 0..3 = 4/5..4/8,
+    power 0 = unknown else 2n + 3 dBm, preset 0 channel heard on, 1 = 144.390 AFSK, 2 = 433.775, 3 = 439.9125, 4 = 434.855."""
+    n = 0
+    for (name, bits), v in zip(_CAP_FIELDS, (role, model, sf, bw, cr, power, preset)):
+        if not 0 <= v < (1 << bits):
+            raise ValueError(name)
+        n = (n << bits) | v
+    return n.to_bytes(3, 'big')
+
+
+def parse_capability(b):
+    n = int.from_bytes(bytes(b), 'big')
+    out = {}
+    for name, bits in reversed(_CAP_FIELDS):
+        out[name] = n & ((1 << bits) - 1)
+        n >>= bits
+    return out
 
 
 # ---------------------------------------------------------------- command line
