@@ -2,6 +2,18 @@
 
 LACF (spec 11) uses semantic versions: MAJOR = wire format version (the low six bits of `V`), MINOR = backward-compatible addition, PATCH = wording only. See "Versions" in `spec/11-native-ppm-frame-byte-plan.md`. The current number is in the file `VERSION`.
 
+## Unreleased - 2.1.0-dev.1, 4 November 2026 (a proposal in the documents only; nothing implemented, not adopted, every change needs F4MLV's agreement)
+
+Documentation only: spec 11, the byte reference, spec 02 and the new `docs/lacf-model-upgrade.md` describe the proposal. `VERSION`, the reference code, the test vectors, the worked example and the pictures are still 2.0.0 and change when the proposal is implemented.
+
+1. **`V = c ss mmmmm`** instead of `vvvvv ttt`: a capability flag, two spare bits and a 5-bit model version (32 models). The protocol version leaves `V`: a change to the front of the frame is a MAJOR change and gets a new frame type byte. Plain frames ignore the model bits.
+2. **Destination byte `c iiiiiii`:** 128 fixed, append-only codes (0 to 125 listed, 126 reserved, 127 the escape), no longer ranked and no longer versioned by `V`; one reserved bit.
+3. **RXT:** 93 (`~`) means "not measured"; 90 to 127 other than 93 are unknown and the frame is kept; 0x80 or more still drops it.
+4. **Relay without the model:** a relay that does not hold a frame's model forwards it byte for byte, adds its own tuple and does not show or use it (measured in the Python reference: 1,792 of 1,792, byte for byte identical to a relay that holds the model).
+5. **Capability bytes:** three bytes after `V` when `c` is set: role (3 bits, with digipeater and iGate "late" tiers), model decoded (5), SF (3), BW (2), CR (2), power (4), preset (5; 433.775, 439.9125 UK, 434.855 Poland). Sent about every 8th beacon.
+6. **Decided not to:** use destination code 126 for a packed `APL` plus three characters (only about 0.5% of real LoRa APRS packets would use it); put a capability frame `3C FF 03` on the air.
+7. Still open: placeholder names in the destination list, the frequency-offset range, how a sender chooses a model.
+
 ## 2.0.0 - 2 November 2026 (protocol version 2, table version 0)
 
 **Breaking.** Three changes to the bytes:
