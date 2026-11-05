@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Spec 11 relay edge vectors: cases where the relay's behaviour is easy to get wrong.   python3 tools/hb21/gen_relay_edge.py > test/vectors_hb21_relay_edge_v1.txt
+"""Spec 11 relay edge vectors: cases where the relay's behaviour is easy to get wrong.   python3 tools/hb3/gen_relay_edge.py > test/vectors_hb3_relay_edge_v1.txt
 Each line: <received frame hex> <relayed frame hex, or - if the relay must NOT relay it> <relayed packet hex, or ->. The relay is N0RLY-(k+1) with tuple bytes 50+k 20+k 45+k 10+k,
 k = the tuples already in the frame (the same rule as the other relay vectors). The relayed frames are those of the Python implementation, which copies the source and destination bytes verbatim."""
 import importlib.util, os, sys
 here = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location('hb', os.path.join(here, 'hb21_py', 'hb21.py')); H = importlib.util.module_from_spec(spec); spec.loader.exec_module(H)
+spec = importlib.util.spec_from_file_location('hb', os.path.join(here, 'hb3_py', 'hb3.py')); H = importlib.util.module_from_spec(spec); spec.loader.exec_module(H)
 INFO = b'!3722.40N/12158.93W>LoRa APRS iGate on the hill'
 out = []
 def add(received, why):

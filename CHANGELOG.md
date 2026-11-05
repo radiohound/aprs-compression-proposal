@@ -2,9 +2,9 @@
 
 LACF (spec 11) uses semantic versions: MAJOR = wire format version (the low six bits of `V`), MINOR = backward-compatible addition, PATCH = wording only. See "Versions" in `spec/11-native-ppm-frame-byte-plan.md`. The current number is in the file `VERSION`.
 
-## Unreleased - 2.1.0-dev.1, 5 November 2026 (a proposal: not adopted, every change needs F4MLV's agreement)
+## Unreleased - 3.0.0-dev.1, 5 November 2026 (a proposal: not adopted, every change needs F4MLV's agreement)
 
-**A separate frame type, `3C FF 03`, described in [spec 12](spec/12-lacf-2.1-dev-byte-plan.md).** The 2.0.0 frame (`3C FF 02`, spec 11) is unchanged and stays the tested baseline: its spec, byte reference, picture, codec (`tools/hb`) and vectors are as they were. The proposal has its own codec (`tools/hb21`, C and Python), vectors (`test/vectors_hb21_*.txt`), byte reference, picture and layout page. A device can hold both decoders (they share the PPM tables). `VERSION`, the firmware (iGate, tracker, Pi software), the README notice and the firmware page are still 2.0.0.
+**A separate frame type, `3C FF 03`, described in [spec 12](spec/12-lacf-3.0-dev-byte-plan.md).** The 2.0.0 frame (`3C FF 02`, spec 11) is unchanged and stays the tested baseline: its spec, byte reference, picture, codec (`tools/hb`) and vectors are as they were. The proposal has its own codec (`tools/hb3`, C and Python), vectors (`test/vectors_hb3_*.txt`), byte reference, picture and layout page. A device can hold both decoders (they share the PPM tables). `VERSION`, the firmware (iGate, tracker, Pi software), the README notice and the firmware page are still 2.0.0.
 
 1. **`V = c ss mmmmm`** instead of `vvvvv ttt`: a capability flag, two spare bits and a 5-bit model version (32 models). The frame type is the generation. Plain frames ignore the model bits.
 2. **Destination byte `c iiiiiii`:** 128 fixed, append-only codes (0 to 125 listed, 126 reserved, 127 the escape), no longer ranked and not versioned by `V`; one reserved bit.

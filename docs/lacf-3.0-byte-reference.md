@@ -1,6 +1,6 @@
 # LACF byte and bit reference
 
-What every byte and bit in the [frame picture](lacf-2.1-frame-layout.md) means and what it does. This sheet describes **LACF 2.1.0-dev.1** ([spec 12](../spec/12-lacf-2.1-dev-byte-plan.md)), a proposal that is not adopted and needs F4MLV's agreement. Its frame type is `3C FF 03`; the tested 2.0.0 format (`3C FF 02`) is described in [lacf-byte-reference.md](lacf-byte-reference.md) and [spec 11](../spec/11-native-ppm-frame-byte-plan.md) and is unchanged. Where 2.0.0 differs, this sheet says so. A value here can change. The spec is the authority; where this sheet and the spec differ, the spec wins. The bytes of the examples come from the reference code (`tools/hb21`).
+What every byte and bit in the [frame picture](lacf-3.0-frame-layout.md) means and what it does. This sheet describes **LACF 3.0.0-dev.1** ([spec 12](../spec/12-lacf-3.0-dev-byte-plan.md)), a proposal that is not adopted and needs F4MLV's agreement. Its frame type is `3C FF 03`; the tested 2.0.0 format (`3C FF 02`) is described in [lacf-byte-reference.md](lacf-byte-reference.md) and [spec 11](../spec/11-native-ppm-frame-byte-plan.md) and is unchanged. Where 2.0.0 differs, this sheet says so. A value here can change. The spec is the authority; where this sheet and the spec differ, the spec wins. The bytes of the examples come from the reference code (`tools/hb3`).
 
 **Notation.** Bits are numbered 7 (the most significant) down to 0. Bytes are written in hex (`3C`). `0b` marks binary. "Big endian" means the most significant byte is sent first; the CRC is the one field sent low byte first. A receiver that meets a value marked "dropped" throws the whole frame away and never shows it as text.
 
@@ -71,7 +71,7 @@ In every form `s` is the used mark: `s = 1` means the element had a `*` (the pac
 
 ### 4.2 The destination byte
 
-The destination is one byte, `c iiiiiii` (2.1.0-dev.1; in 2.0.0 it was `ff iiiiii` with 62 ranked codes):
+The destination is one byte, `c iiiiiii` (3.0.0-dev.1; in 2.0.0 it was `ff iiiiii` with 62 ranked codes):
 
 | Bits | Name | What it does |
 |---|---|---|
@@ -130,7 +130,7 @@ The content field carries the text: the whole information field in kinds 0 and 2
 
 ### 6.1 V, the model and capability byte
 
-2.1.0-dev.1; in 2.0.0 this byte was `vvvvv ttt` (protocol version 2 and table version 0, so `10`). The protocol version is not needed here: the frame type is the generation.
+3.0.0-dev.1; in 2.0.0 this byte was `vvvvv ttt` (protocol version 2 and table version 0, so `10`). The protocol version is not needed here: the frame type is the generation.
 
 | Bits | Name | Values | What it does |
 |---|---|---|---|
@@ -149,7 +149,7 @@ The protocol version is no longer a field: a change to the front of the frame is
 | CRC-16 | 2 B | a check on the text and addresses, sent **low byte first** |
 | PPM payload | n B | the text, coded with the table version; the length n is not sent, the receiver works it out |
 
-**The CRC** is CRC-16/X-25 (polynomial 0x1021 reflected, initial value 0xFFFF, result inverted), taken **over the bytes as sent** (2.1.0-dev.1; in 2.0.0 it was over the decoded text). In this order: the header byte AND 0x07 (the reserved bit and the kind bits), V, the capability bytes when `c` is set, the source and destination bytes (everything between the header and the path), the position block (kinds 1 and 3), L (LACF content only), and the payload or the text. It does not cover the path, the path count, the RXT flag or the RXT block, which relays change, so a relay never recomputes it. Because it needs no decoding, **a relay that does not hold the model can check it**. A damaged source, destination, position block, V, capability byte, L or payload fails it.
+**The CRC** is CRC-16/X-25 (polynomial 0x1021 reflected, initial value 0xFFFF, result inverted), taken **over the bytes as sent** (3.0.0-dev.1; in 2.0.0 it was over the decoded text). In this order: the header byte AND 0x07 (the reserved bit and the kind bits), V, the capability bytes when `c` is set, the source and destination bytes (everything between the header and the path), the position block (kinds 1 and 3), L (LACF content only), and the payload or the text. It does not cover the path, the path count, the RXT flag or the RXT block, which relays change, so a relay never recomputes it. Because it needs no decoding, **a relay that does not hold the model can check it**. A damaged source, destination, position block, V, capability byte, L or payload fails it.
 
 In the example `C3 EE` is the CRC `0xEEC3`, `00` is V (no capability bytes, model version 0) and `1B` is L = 27, the length of `LoRa APRS iGate on the hill`.
 
@@ -197,7 +197,7 @@ tuple 1 | tuple 2 | ... | tuple k | mask        (4k + 1 bytes; the last byte of 
 | 3 | frequency offset | 0 to 89 | how far the sender's frequency was from the relay's, roughly -2500 to +2500 Hz, on a non-linear scale (the middle of the range is near 0 Hz) |
 | 4 | time to hop | 0 to 89 | the time from the end of reception to the end of the relay's own transmission, on an exponential scale based on the symbol time; it includes queueing, channel access and the time on air |
 
-The ranges are the RXT characters minus 33, as defined in F4MLV's RXT description (`moricef/LoRa_APRS_iGate`, branch `rxt`). In 2.1.0-dev.1 a tuple byte of 0x80 or more is dropped, **93 (`~`) means "not measured"** in any field, 90 to 92 are reserved, and a byte from 90 to 127 other than 93 is unknown for its field and the frame is kept (in 2.0.0 a byte above the maximum for its field dropped the frame). A reading beyond the end of the frequency offset scale is for now clamped to the end value. The example tuple `32 14 2D 0A` is the test vector (RSSI 50, SNR 20, frequency offset 45, time to hop 10), which would be about -80 dBm and -14 dB; it is not a real measurement.
+The ranges are the RXT characters minus 33, as defined in F4MLV's RXT description (`moricef/LoRa_APRS_iGate`, branch `rxt`). In 3.0.0-dev.1 a tuple byte of 0x80 or more is dropped, **93 (`~`) means "not measured"** in any field, 90 to 92 are reserved, and a byte from 90 to 127 other than 93 is unknown for its field and the frame is kept (in 2.0.0 a byte above the maximum for its field dropped the frame). A reading beyond the end of the frequency offset scale is for now clamped to the end value. The example tuple `32 14 2D 0A` is the test vector (RSSI 50, SNR 20, frequency offset 45, time to hop 10), which would be about -80 dBm and -14 dB; it is not a real measurement.
 
 ### 7.2 The mask byte
 
@@ -210,7 +210,7 @@ The mask can only name path elements 0 to 6, so at most 7 elements carry a tuple
 
 ## 8. The two example frames, byte by byte
 
-The 35-byte frame and the 44-byte frame after one relay hop are shown byte by byte, with the same colours as the picture, in [lacf-2.1-frame-layout.md](lacf-2.1-frame-layout.md).
+The 35-byte frame and the 44-byte frame after one relay hop are shown byte by byte, with the same colours as the picture, in [lacf-3.0-frame-layout.md](lacf-3.0-frame-layout.md).
 
 ## 9. What a receiver drops
 

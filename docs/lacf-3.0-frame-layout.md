@@ -1,10 +1,10 @@
-# What a LACF 2.1.0-dev.1 frame looks like (proposal, frame type 03)
+# What a LACF 3.0.0-dev.1 frame looks like (proposal, frame type 03)
 
-This page shows the **proposed LACF 2.1.0-dev.1** ([spec 12](../spec/12-lacf-2.1-dev-byte-plan.md)), a separate frame type, `3C FF 03`. It is not adopted, every change needs F4MLV's agreement, and the format may change. The tested 2.0.0 frame (`3C FF 02`) is unchanged: see [lacf-frame-layout.md](lacf-frame-layout.md) and [spec 11](../spec/11-native-ppm-frame-byte-plan.md). This page shows the layout once as a picture and once as tables, then follows one real packet byte by byte.
+This page shows the **proposed LACF 3.0.0-dev.1** ([spec 12](../spec/12-lacf-3.0-dev-byte-plan.md)), a separate frame type, `3C FF 03`. It is not adopted, every change needs F4MLV's agreement, and the format may change. The tested 2.0.0 frame (`3C FF 02`) is unchanged: see [lacf-frame-layout.md](lacf-frame-layout.md) and [spec 11](../spec/11-native-ppm-frame-byte-plan.md). This page shows the layout once as a picture and once as tables, then follows one real packet byte by byte.
 
-![The fields of a LACF frame, the header and V bytes, the RXT block, and a worked example of 35 bytes, and 44 bytes after one relay hop](img/lacf-2.1-frame-layout.svg)
+![The fields of a LACF frame, the header and V bytes, the RXT block, and a worked example of 35 bytes, and 44 bytes after one relay hop](img/lacf-3.0-frame-layout.svg)
 
-Every byte and bit in the picture is defined, with its values and what it does, in the [byte and bit reference](lacf-2.1-byte-reference.md). A larger PNG of the same picture is [`img/lacf-2.1-frame-layout.png`](img/lacf-2.1-frame-layout.png). The bytes in the picture come from the reference code (`tools/hb`); regenerate the picture with `python3 tools/lacf_diagram.py > docs/img/lacf-frame-layout.svg`.
+Every byte and bit in the picture is defined, with its values and what it does, in the [byte and bit reference](lacf-3.0-byte-reference.md). A larger PNG of the same picture is [`img/lacf-3.0-frame-layout.png`](img/lacf-3.0-frame-layout.png). The bytes in the picture come from the reference code (`tools/hb`); regenerate the picture with `python3 tools/lacf_diagram.py > docs/img/lacf-frame-layout.svg`.
 
 ## The fields, in the order they are sent
 

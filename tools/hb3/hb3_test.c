@@ -1,16 +1,16 @@
 /* Tests and tools for the spec 11 reference frame (tools/hb/hb.c).  Run from the repository root.
- *   hb21_test gen  < packets.txt          TNC2 packets -> "<frame hex> <tnc2 hex>" vectors ("-" for a packet that cannot be encoded)
- *   hb21_test check VECTORS               every vector must encode to its frame and decode to its packet
- *   hb21_test recv                        lines "<frame hex>" -> the accepted TNC2 as hex, or "-" (cross-check against another implementation)
- *   hb21_test relaychain < packets.txt    the same for the second and later hops (frames that already carry tuples): "<received> <relayed> <relayed tnc2>"
- *   hb21_test relaycheck FILE             check a relay vector file against hb21_relay
- *   hb21_test relaytocheck FILE           the same file through hb21_relay_to, with the relayed path taken from the file
- *   hb21_test relaygen  < packets.txt     for each packet with an unused WIDE1-1 or WIDE2-2: "<frame hex> <relayed frame hex> <relayed tnc2 hex>"
- *   hb21_test capcheck FILE               "<frame hex> <tnc2 hex> <capability hex>": encode with the four capability bytes, decode, and the bytes read back
- *   hb21_test passcheck FILE              "<received hex> <pass-through relayed hex or -> <normal relay hex or ->": first-hop relay N0RLY-1; the pass-through relay and the relay that decodes
- *   hb21_test props packets.txt           cuts, appended bytes, bit flips, RXT, relay: what is accepted that should not be
- *   hb21_test time packets.txt            encode and decode time on this machine */
-#include "hb21.h"
+ *   hb3_test gen  < packets.txt          TNC2 packets -> "<frame hex> <tnc2 hex>" vectors ("-" for a packet that cannot be encoded)
+ *   hb3_test check VECTORS               every vector must encode to its frame and decode to its packet
+ *   hb3_test recv                        lines "<frame hex>" -> the accepted TNC2 as hex, or "-" (cross-check against another implementation)
+ *   hb3_test relaychain < packets.txt    the same for the second and later hops (frames that already carry tuples): "<received> <relayed> <relayed tnc2>"
+ *   hb3_test relaycheck FILE             check a relay vector file against hb3_relay
+ *   hb3_test relaytocheck FILE           the same file through hb3_relay_to, with the relayed path taken from the file
+ *   hb3_test relaygen  < packets.txt     for each packet with an unused WIDE1-1 or WIDE2-2: "<frame hex> <relayed frame hex> <relayed tnc2 hex>"
+ *   hb3_test capcheck FILE               "<frame hex> <tnc2 hex> <capability hex>": encode with the four capability bytes, decode, and the bytes read back
+ *   hb3_test passcheck FILE              "<received hex> <pass-through relayed hex or -> <normal relay hex or ->": first-hop relay N0RLY-1; the pass-through relay and the relay that decodes
+ *   hb3_test props packets.txt           cuts, appended bytes, bit flips, RXT, relay: what is accepted that should not be
+ *   hb3_test time packets.txt            encode and decode time on this machine */
+#include "hb3.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,31 +33,31 @@ static size_t read_lines(const char *path, char (*lines)[700], size_t max)
 
 int main(int argc, char **argv)
 {
-    const char *list = getenv("HB21_LIST") ? getenv("HB21_LIST") : "tools/hybrid/tables/tocall_set1.txt";
+    const char *list = getenv("HB3_LIST") ? getenv("HB3_LIST") : "tools/hybrid/tables/tocall_set1.txt";
     static char lines[20000][700]; size_t n, i; uint8_t fr[400]; char tn[800];
-    if (hb21_load_list(list) != 62) { fprintf(stderr, "cannot load the destination list %s (run from the repository root)\n", list); return 2; }
-    if (hb21_crc16((const uint8_t *)"123456789", 9) != 0x906E) { fprintf(stderr, "CRC check value wrong\n"); return 2; }
-    if (argc < 2) { fprintf(stderr, "usage: hb21_test gen|check|recv|relaygen|props|time [file]\n"); return 2; }
+    if (hb3_load_list(list) != 62) { fprintf(stderr, "cannot load the destination list %s (run from the repository root)\n", list); return 2; }
+    if (hb3_crc16((const uint8_t *)"123456789", 9) != 0x906E) { fprintf(stderr, "CRC check value wrong\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: hb3_test gen|check|recv|relaygen|props|time [file]\n"); return 2; }
 
     if (!strcmp(argv[1], "gen")) {
         n = read_lines(NULL, lines, 20000);
-        printf("# Spec 11 test vectors: <frame hex> <TNC2 packet hex>. Proposal 2.1.0-dev.1: model version 0 (V = 0x00), destination list set 1 (fixed codes). '-' = not encodable (a plain frame is sent).\n");
-        for (i = 0; i < n; i++) { size_t w = hb21_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); if (w) hexout(fr, w); else fputs("-", stdout); putchar(' '); hexout((uint8_t *)lines[i], strlen(lines[i])); putchar('\n'); }
+        printf("# Spec 11 test vectors: <frame hex> <TNC2 packet hex>. Proposal 3.0.0-dev.1: model version 0 (V = 0x00), destination list set 1 (fixed codes). '-' = not encodable (a plain frame is sent).\n");
+        for (i = 0; i < n; i++) { size_t w = hb3_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); if (w) hexout(fr, w); else fputs("-", stdout); putchar(' '); hexout((uint8_t *)lines[i], strlen(lines[i])); putchar('\n'); }
         return 0;
     }
     if (!strcmp(argv[1], "check") && argc > 2) {
         FILE *f = fopen(argv[2], "r"); char l[2000]; int cnt = 0, bad = 0, sk = 0;
         if (!f) { perror(argv[2]); return 2; }
         while (fgets(l, sizeof l, f)) {
-            char *sp; uint8_t want[400], txt[800]; size_t wl, tl; hb21_info_t in; size_t w;
+            char *sp; uint8_t want[400], txt[800]; size_t wl, tl; hb3_info_t in; size_t w;
             if (l[0] == '#' || l[0] == '\n') continue;
             sp = strchr(l, ' '); if (!sp) continue; *sp++ = 0;
             tl = unhex(sp, txt, sizeof txt); txt[tl] = 0; cnt++;
-            if (!strcmp(l, "-")) { if (hb21_encode((char *)txt, tl, NULL, fr, sizeof fr, NULL)) { bad++; printf("vector %d: encodes but the vector says it cannot\n", cnt); } sk++; continue; }
+            if (!strcmp(l, "-")) { if (hb3_encode((char *)txt, tl, NULL, fr, sizeof fr, NULL)) { bad++; printf("vector %d: encodes but the vector says it cannot\n", cnt); } sk++; continue; }
             wl = unhex(l, want, sizeof want);
-            w = hb21_encode((char *)txt, tl, NULL, fr, sizeof fr, &in);
+            w = hb3_encode((char *)txt, tl, NULL, fr, sizeof fr, &in);
             if (w != wl || memcmp(fr, want, wl)) { bad++; printf("vector %d: encode mismatch\n", cnt); continue; }
-            { int r = hb21_decode(want, wl, tn, sizeof tn, &in); if (r != (int)tl || memcmp(tn, txt, tl)) { bad++; printf("vector %d: decode %s\n", cnt, r < 0 ? hb21_reason(r) : "mismatch"); } }
+            { int r = hb3_decode(want, wl, tn, sizeof tn, &in); if (r != (int)tl || memcmp(tn, txt, tl)) { bad++; printf("vector %d: decode %s\n", cnt, r < 0 ? hb3_reason(r) : "mismatch"); } }
         }
         fclose(f);
         printf("%d vectors (%d not encodable), %d failed\n", cnt, sk, bad);
@@ -65,19 +65,19 @@ int main(int argc, char **argv)
     }
     if (!strcmp(argv[1], "recv")) {
         char l[2000];
-        while (fgets(l, sizeof l, stdin)) { uint8_t b[400]; size_t bl = unhex(l, b, sizeof b); int r = hb21_decode(b, bl, tn, sizeof tn, NULL); if (r > 0) hexout((uint8_t *)tn, (size_t)r); else fputs("-", stdout); putchar('\n'); }
+        while (fgets(l, sizeof l, stdin)) { uint8_t b[400]; size_t bl = unhex(l, b, sizeof b); int r = hb3_decode(b, bl, tn, sizeof tn, NULL); if (r > 0) hexout((uint8_t *)tn, (size_t)r); else fputs("-", stdout); putchar('\n'); }
         return 0;
     }
     if (!strcmp(argv[1], "relaytocheck")) {
-        /* the same vectors through hb21_relay_to: the new path is the one the vector lists (column 3, the relayed packet). For a vector that must not be relayed (column 2 is '-') the
-         * path is made here by the same rule as hb21_relay's (first unused WIDE1-1, WIDE2-1 or WIDE2-2); if that does not apply the vector is not run. */
+        /* the same vectors through hb3_relay_to: the new path is the one the vector lists (column 3, the relayed packet). For a vector that must not be relayed (column 2 is '-') the
+         * path is made here by the same rule as hb3_relay's (first unused WIDE1-1, WIDE2-1 or WIDE2-2); if that does not apply the vector is not run. */
         FILE *f = fopen(argv[2], "r"); char l[3000]; int cnt = 0, bad = 0, skipped = 0;
         while (f && fgets(l, sizeof l, f)) {
-            uint8_t a[400], b[400], out[400], t4[4]; char c[40], nt[800], *p1, *p2; size_t al, bl, r, nl; hb21_info_t in; int d, k;
+            uint8_t a[400], b[400], out[400], t4[4]; char c[40], nt[800], *p1, *p2; size_t al, bl, r, nl; hb3_info_t in; int d, k;
             if (l[0] == '#' || l[0] == '\n') continue;
             p1 = strchr(l, ' '); p2 = p1 ? strchr(p1 + 1, ' ') : NULL; if (!p2) { bad++; continue; }
             al = unhex(l, a, sizeof a); bl = unhex(p1 + 1, b, sizeof b); cnt++;
-            if (hb21_decode(a, al, tn, sizeof tn, &in) <= 0) { bad++; continue; }
+            if (hb3_decode(a, al, tn, sizeof tn, &in) <= 0) { bad++; continue; }
             k = in.has_rxt ? in.rxt.n : 0; snprintf(c, sizeof c, "N0RLY-%d", k + 1); { int q; for (q = 0; q < 4; q++) t4[q] = (uint8_t)(TUP[q] + k); }
             if (p1[1] == '-') {
                 char *comma = strchr(tn, ','), *colon = strchr(tn, ':'), *u; size_t head;
@@ -89,14 +89,14 @@ int main(int argc, char **argv)
                 else if (!strncmp(u, "WIDE2-1", 7) && (u[7] == ',' || u[7] == ':')) nl = (size_t)snprintf(nt, sizeof nt, "%.*s%s*%s", (int)head, tn, c, u + 7);
                 else if (!strncmp(u, "WIDE2-2", 7) && (u[7] == ',' || u[7] == ':')) nl = (size_t)snprintf(nt, sizeof nt, "%.*s%s*,WIDE2-1%s", (int)head, tn, c, u + 7);
                 else { skipped++; continue; }
-                r = hb21_relay_to(a, al, nt, nl, c, t4, out, sizeof out);
+                r = hb3_relay_to(a, al, nt, nl, c, t4, out, sizeof out);
                 if (r) { bad++; printf("relay-to vector %d: relayed a frame that must not be relayed\n", cnt); }
                 continue;
             }
             { char *p3 = strchr(p2 + 1, ' '); size_t tl; uint8_t tb[800]; (void)p3;
               tl = unhex(p2 + 1, tb, sizeof tb); if (tl == 0 || tl >= sizeof nt) { bad++; continue; } memcpy(nt, tb, tl); nt[tl] = 0; nl = tl; }
-            r = hb21_relay_to(a, al, nt, nl, c, t4, out, sizeof out);
-            d = r ? hb21_decode(out, r, tn, sizeof tn, NULL) : -1;
+            r = hb3_relay_to(a, al, nt, nl, c, t4, out, sizeof out);
+            d = r ? hb3_decode(out, r, tn, sizeof tn, NULL) : -1;
             if (r != bl || memcmp(out, b, bl) || d <= 0) { bad++; printf("relay-to vector %d: mismatch\n", cnt); }
         }
         if (f) fclose(f);
@@ -109,15 +109,15 @@ int main(int argc, char **argv)
         if (!chain) {
             FILE *f = fopen(argv[2], "r"); char l[3000]; int cnt = 0, bad = 0;
             while (f && fgets(l, sizeof l, f)) {
-                uint8_t a[400], b[400], out[400], t4[4]; char c[40], *p1, *p2; size_t al, bl, r; hb21_info_t in; int d;
+                uint8_t a[400], b[400], out[400], t4[4]; char c[40], *p1, *p2; size_t al, bl, r; hb3_info_t in; int d;
                 if (l[0] == '#' || l[0] == '\n') continue;
                 p1 = strchr(l, ' '); p2 = p1 ? strchr(p1 + 1, ' ') : NULL; if (!p2) { bad++; continue; }
                 al = unhex(l, a, sizeof a); bl = unhex(p1 + 1, b, sizeof b); cnt++;
-                if (hb21_decode(a, al, tn, sizeof tn, &in) <= 0) { bad++; continue; }
+                if (hb3_decode(a, al, tn, sizeof tn, &in) <= 0) { bad++; continue; }
                 { int k = in.has_rxt ? in.rxt.n : 0; int q; snprintf(c, sizeof c, "N0RLY-%d", k + 1); for (q = 0; q < 4; q++) t4[q] = (uint8_t)(TUP[q] + k); }
-                r = hb21_relay(a, al, c, t4, out, sizeof out);
+                r = hb3_relay(a, al, c, t4, out, sizeof out);
                 if (p1[1] == '-') { if (r) { bad++; printf("relay vector %d: relayed a frame that must not be relayed\n", cnt); } continue; }     /* '-': the relay must refuse */
-                d = r ? hb21_decode(out, r, tn, sizeof tn, NULL) : -1;
+                d = r ? hb3_decode(out, r, tn, sizeof tn, NULL) : -1;
                 if (r != bl || memcmp(out, b, bl) || d <= 0) { bad++; printf("relay vector %d: mismatch\n", cnt); }
             }
             if (f) fclose(f);
@@ -126,13 +126,13 @@ int main(int argc, char **argv)
         }
         n = read_lines(NULL, lines, 20000);
         for (i = 0; i < n; i++) {
-            size_t w = hb21_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); int k;
+            size_t w = hb3_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); int k;
             if (!w) continue;
             for (k = 0; k < 7; k++) {
                 uint8_t out[400], t4[4]; char c[40]; size_t r; int q, d;
                 snprintf(c, sizeof c, "N0RLY-%d", k + 1); for (q = 0; q < 4; q++) t4[q] = (uint8_t)(TUP[q] + k);
-                r = hb21_relay(fr, w, c, t4, out, sizeof out); if (!r) break;
-                d = hb21_decode(out, r, tn, sizeof tn, NULL);
+                r = hb3_relay(fr, w, c, t4, out, sizeof out); if (!r) break;
+                d = hb3_decode(out, r, tn, sizeof tn, NULL);
                 if (k >= 1) { hexout(fr, w); putchar(' '); hexout(out, r); putchar(' '); if (d > 0) hexout((uint8_t *)tn, (size_t)d); else fputs("-", stdout); putchar('\n'); }
                 memcpy(fr, out, r); w = r;
             }
@@ -142,11 +142,11 @@ int main(int argc, char **argv)
     if (!strcmp(argv[1], "relaygen")) {
         n = read_lines(NULL, lines, 20000);
         for (i = 0; i < n; i++) {
-            size_t w = hb21_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL), r; uint8_t out[400]; int d;
+            size_t w = hb3_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL), r; uint8_t out[400]; int d;
             if (!w) continue;
-            r = hb21_relay(fr, w, "N0RLY-1", TUP, out, sizeof out);
+            r = hb3_relay(fr, w, "N0RLY-1", TUP, out, sizeof out);
             if (!r) continue;
-            d = hb21_decode(out, r, tn, sizeof tn, NULL);
+            d = hb3_decode(out, r, tn, sizeof tn, NULL);
             hexout(fr, w); putchar(' '); hexout(out, r); putchar(' '); if (d > 0) hexout((uint8_t *)tn, (size_t)d); else fputs("-", stdout); putchar('\n');
         }
         return 0;
@@ -155,14 +155,14 @@ int main(int argc, char **argv)
         FILE *f = fopen(argv[2], "r"); char l[3000]; int cnt = 0, bad = 0;
         if (!f) { perror(argv[2]); return 2; }
         while (fgets(l, sizeof l, f)) {
-            char *a, *b; uint8_t want[400], txt[800], cap3[8]; size_t wl, tl; hb21_info_t in; size_t w; int r;
+            char *a, *b; uint8_t want[400], txt[800], cap3[8]; size_t wl, tl; hb3_info_t in; size_t w; int r;
             if (l[0] == '#' || l[0] == '\n') continue;
             a = strchr(l, ' '); if (!a) continue; *a++ = 0; b = strchr(a, ' '); if (!b) continue; *b++ = 0;
             wl = unhex(l, want, sizeof want); tl = unhex(a, txt, sizeof txt); txt[tl] = 0; unhex(b, cap3, sizeof cap3); cnt++;
-            w = hb21_encode_cap((char *)txt, tl, NULL, cap3, fr, sizeof fr, &in);
+            w = hb3_encode_cap((char *)txt, tl, NULL, cap3, fr, sizeof fr, &in);
             if (w != wl || memcmp(fr, want, wl)) { bad++; printf("capability vector %d: encode mismatch\n", cnt); continue; }
-            r = hb21_decode(want, wl, tn, sizeof tn, &in);
-            if (r != (int)tl || memcmp(tn, txt, tl) || !in.has_cap || memcmp(in.cap, cap3, 4)) { bad++; printf("capability vector %d: decode %s\n", cnt, r < 0 ? hb21_reason(r) : "mismatch"); }
+            r = hb3_decode(want, wl, tn, sizeof tn, &in);
+            if (r != (int)tl || memcmp(tn, txt, tl) || !in.has_cap || memcmp(in.cap, cap3, 4)) { bad++; printf("capability vector %d: decode %s\n", cnt, r < 0 ? hb3_reason(r) : "mismatch"); }
         }
         fclose(f);
         printf("%d capability vectors, %d failed\n", cnt, bad);
@@ -176,9 +176,9 @@ int main(int argc, char **argv)
             if (l[0] == '#' || l[0] == '\n') continue;
             a = strchr(l, ' '); if (!a) continue; *a++ = 0; b = strchr(a, ' '); if (!b) continue; *b++ = 0;
             rl = unhex(l, rx, sizeof rx); if (a[0] != '-') pl = unhex(a, pw, sizeof pw); if (b[0] != '-') nl = unhex(b, nw, sizeof nw); cnt++;
-            w = hb21_relay_passthrough(rx, rl, "N0RLY-1", TUP, o, sizeof o);
+            w = hb3_relay_passthrough(rx, rl, "N0RLY-1", TUP, o, sizeof o);
             if (w != pl || (pl && memcmp(o, pw, pl))) { bad++; printf("pass-through vector %d: relay mismatch\n", cnt); continue; }
-            w = hb21_relay(rx, rl, "N0RLY-1", TUP, o, sizeof o);
+            w = hb3_relay(rx, rl, "N0RLY-1", TUP, o, sizeof o);
             if (w != nl || (nl && memcmp(o, nw, nl))) { bad++; printf("pass-through vector %d: the relay that decodes differs\n", cnt); }
         }
         fclose(f);
@@ -192,30 +192,30 @@ int main(int argc, char **argv)
         static const char *regname[6] = { "prefix and header byte", "source and destination", "path", "position block", "content: V, L, CRC", "content: payload or text" };
         n = read_lines(argv[2], lines, 20000);
         for (i = 0; i < n; i++) {
-            size_t w = hb21_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL), k; hb21_info_t in; int d, c;
+            size_t w = hb3_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL), k; hb3_info_t in; int d, c;
             if (!w) continue;
-            d = hb21_decode(fr, w, tn, sizeof tn, &in);
+            d = hb3_decode(fr, w, tn, sizeof tn, &in);
             if (d == (int)strlen(lines[i]) && !memcmp(tn, lines[i], (size_t)d)) intact_ok++;
             c = in.cc; frames[c]++;
-            for (k = 1; k < w; k++) { cut_n[c]++; if (hb21_decode(fr, w - k, tn, sizeof tn, NULL) > 0) cut_acc[c]++; }
-            for (k = 1; k <= 8; k++) { uint8_t b[400]; size_t q; memcpy(b, fr, w); for (q = 0; q < k; q++) b[w + q] = (uint8_t)rnd(); app_n[c]++; if (hb21_decode(b, w + k, tn, sizeof tn, NULL) > 0) app_acc[c]++; }
+            for (k = 1; k < w; k++) { cut_n[c]++; if (hb3_decode(fr, w - k, tn, sizeof tn, NULL) > 0) cut_acc[c]++; }
+            for (k = 1; k <= 8; k++) { uint8_t b[400]; size_t q; memcpy(b, fr, w); for (q = 0; q < k; q++) b[w + q] = (uint8_t)rnd(); app_n[c]++; if (hb3_decode(b, w + k, tn, sizeof tn, NULL) > 0) app_acc[c]++; }
             { size_t bit; for (bit = 0; bit < w * 8; bit++) {
                 uint8_t b[400]; size_t byte = bit / 8; int reg, dd; memcpy(b, fr, w); b[byte] ^= (uint8_t)(1u << (bit % 8)); flip_n[c]++;
                 reg = byte < 4 ? 0 : byte < in.path_start ? 1 : byte < in.front_len ? 2 : byte < in.content_start ? 3 : (c == 0 && byte < in.content_start + 4) ? 4 : 5;
                 reg_n[c][reg]++;
-                dd = hb21_decode(b, w, tn, sizeof tn, NULL);
+                dd = hb3_decode(b, w, tn, sizeof tn, NULL);
                 if (dd > 0) { flip_acc[c]++; if (dd != (int)strlen(lines[i]) || memcmp(tn, lines[i], (size_t)dd)) { flip_wrong[c]++; reg_wrong[c][reg]++; } }
             } }
-            { hb21_rxt_t rx; uint8_t b[400]; size_t w2; int np = 0; const char *p = strchr(lines[i], '>'); const char *cp = strchr(lines[i], ':');
+            { hb3_rxt_t rx; uint8_t b[400]; size_t w2; int np = 0; const char *p = strchr(lines[i], '>'); const char *cp = strchr(lines[i], ':');
               for (; p && p < cp; p++) if (*p == ',') np++;
               if (np >= 1) {
                   memset(&rx, 0, sizeof rx); rx.n = 1; rx.idx[0] = 0; memcpy(rx.t[0], TUP, 4); rx_n++;
-                  w2 = hb21_encode(lines[i], strlen(lines[i]), &rx, b, sizeof b, &in);
-                  if (w2) { d = hb21_decode(b, w2, tn, sizeof tn, &in); if (d > 0 && in.has_rxt && in.rxt.n == 1 && !memcmp(in.rxt.t[0], TUP, 4)) rx_ok++;
+                  w2 = hb3_encode(lines[i], strlen(lines[i]), &rx, b, sizeof b, &in);
+                  if (w2) { d = hb3_decode(b, w2, tn, sizeof tn, &in); if (d > 0 && in.has_rxt && in.rxt.n == 1 && !memcmp(in.rxt.t[0], TUP, 4)) rx_ok++;
                             for (k = 1; k < w2; k++) { size_t keep = w2 - k; (void)keep; } }
               } }
-            { uint8_t out[400]; size_t r = hb21_relay(fr, w, "N0RLY-1", TUP, out, sizeof out);
-              if (r) { rl_n++; d = hb21_decode(out, r, tn, sizeof tn, &in);
+            { uint8_t out[400]; size_t r = hb3_relay(fr, w, "N0RLY-1", TUP, out, sizeof out);
+              if (r) { rl_n++; d = hb3_decode(out, r, tn, sizeof tn, &in);
                        if (d > 0 && in.has_rxt) { size_t ca = 0; rl_ok++; while (ca < w && ca < r && fr[w - 1 - ca] == out[r - 1 - 5 - ca]) ca++; if (ca >= in.content_len) rl_copy++; } } }
         }
         printf("%ld frames, %ld with PPM content and %ld with plain content; intact frames decoded to the original: %ld\n", frames[0] + frames[1], frames[0], frames[1], intact_ok);
@@ -237,9 +237,9 @@ int main(int argc, char **argv)
     if (!strcmp(argv[1], "time") && argc > 2) {
         clock_t t0; size_t reps = 20, r; double te, td; size_t okn = 0; static uint8_t frs[3000][260]; static size_t fl[3000];
         n = read_lines(argv[2], lines, 3000);
-        for (i = 0; i < n; i++) { fl[i] = hb21_encode(lines[i], strlen(lines[i]), NULL, frs[i], 260, NULL); if (fl[i]) okn++; }
-        t0 = clock(); for (r = 0; r < reps; r++) for (i = 0; i < n; i++) hb21_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); te = (double)(clock() - t0) / CLOCKS_PER_SEC;
-        t0 = clock(); for (r = 0; r < reps; r++) for (i = 0; i < n; i++) if (fl[i]) hb21_decode(frs[i], fl[i], tn, sizeof tn, NULL); td = (double)(clock() - t0) / CLOCKS_PER_SEC;
+        for (i = 0; i < n; i++) { fl[i] = hb3_encode(lines[i], strlen(lines[i]), NULL, frs[i], 260, NULL); if (fl[i]) okn++; }
+        t0 = clock(); for (r = 0; r < reps; r++) for (i = 0; i < n; i++) hb3_encode(lines[i], strlen(lines[i]), NULL, fr, sizeof fr, NULL); te = (double)(clock() - t0) / CLOCKS_PER_SEC;
+        t0 = clock(); for (r = 0; r < reps; r++) for (i = 0; i < n; i++) if (fl[i]) hb3_decode(frs[i], fl[i], tn, sizeof tn, NULL); td = (double)(clock() - t0) / CLOCKS_PER_SEC;
         printf("%zu packets (%zu encodable): encode %.1f us, decode %.1f us per packet on this machine\n", n, okn, te * 1e6 / (double)(reps * n), td * 1e6 / (double)(reps * okn));
         return 0;
     }

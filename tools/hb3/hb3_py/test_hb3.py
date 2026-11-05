@@ -1,7 +1,7 @@
-"""Checks of the proposal 2.1.0-dev.1 (spec 12, frame type 3C FF 03) on the Python reference. Run from the repository root:  python3 tools/hb21/hb21_py/test_hb21.py"""
+"""Checks of the proposal 3.0.0-dev.1 (spec 12, frame type 3C FF 03) on the Python reference. Run from the repository root:  python3 tools/hb3/hb3_py/test_hb3.py"""
 import os, random, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import hb21 as H
+import hb3 as H
 ROOT = H.ROOT
 res = []
 def ok(name, cond, note=''): res.append((name, bool(cond), note))
@@ -85,14 +85,14 @@ ok('...and a station that holds model 1 decodes the relayed frame', isinstance(H
 H.KNOWN_MODELS = (0,)
 # the vector files
 def vec(name): return [l.split() for l in open(os.path.join(ROOT, 'test', name)) if l.strip() and not l.startswith('#')]
-v = vec('vectors_hb21_cap_v1.txt')
+v = vec('vectors_hb3_cap_v1.txt')
 ok('capability vectors (%d) agree' % len(v), all(H.encode(bytes.fromhex(p), cap=bytes.fromhex(c)) == bytes.fromhex(f) and H.decode(bytes.fromhex(f)) == bytes.fromhex(p) for f, p, c in v))
-v = vec('vectors_hb21_passthrough_v1.txt')
+v = vec('vectors_hb3_passthrough_v1.txt')
 def pt_ok(r, p, nn):
     r = bytes.fromhex(r); a = H.relay_passthrough(r); b = H.relay(r)
     return (a.hex() if a is not None else '-') == p and (b.hex() if b is not None else '-') == nn
 ok('pass-through vectors (%d) agree' % len(v), all(pt_ok(*x) for x in v))
-v = vec('vectors_hb21_reject_v1.txt')
+v = vec('vectors_hb3_reject_v1.txt')
 ok('rejection vectors (%d) are all dropped' % len(v), all(not isinstance(H.decode(bytes.fromhex(x[0])), bytes) for x in v))
 for n_, c, note in res: print('PASS' if c else 'FAIL', n_, note)
 print('%d/%d pass' % (sum(c for _, c, _ in res), len(res)))

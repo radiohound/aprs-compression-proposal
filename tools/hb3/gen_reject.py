@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Spec 12 rejection vectors (2.1.0-dev.1, frame type 3C FF 03): frames that no encoder can produce (an impossible RXT block, header, content coding or address element) which every receiver must DROP.   python3 tools/hb21/gen_reject.py > test/vectors_hb21_reject_v1.txt
-Each line: <frame hex> <reason>. Built from the first second-hop frame of test/vectors_hb21_relay_chain_v1.txt (two tuples, mask 0x83) and its received frame."""
+"""Spec 12 rejection vectors (3.0.0-dev.1, frame type 3C FF 03): frames that no encoder can produce (an impossible RXT block, header, content coding or address element) which every receiver must DROP.   python3 tools/hb3/gen_reject.py > test/vectors_hb3_reject_v1.txt
+Each line: <frame hex> <reason>. Built from the first second-hop frame of test/vectors_hb3_relay_chain_v1.txt (two tuples, mask 0x83) and its received frame."""
 import importlib.util, os, sys
 here = os.path.dirname(os.path.abspath(__file__)); test = os.path.join(here, '..', '..', 'test')
-rows = [l.split() for l in open(os.path.join(test, 'vectors_hb21_relay_chain_v1.txt')) if l.strip() and l[0] != '#']
+rows = [l.split() for l in open(os.path.join(test, 'vectors_hb3_relay_chain_v1.txt')) if l.strip() and l[0] != '#']
 f = bytes.fromhex(rows[0][1])                    # relayed twice: ends with t1 t2 mask
 assert f[-1] == 0x83 and f[3] & 8
 body, t1, t2 = f[:-9], f[-9:-5], f[-5:-1]
@@ -21,7 +21,7 @@ add(f[:3] + bytes([hdr & ~8]) + f[4:], 'RXT bit cleared but the block is still t
 o = bytes.fromhex(rows[0][0])                    # the frame before the second relay: one tuple; take its origin by dropping the block
 o = o[:3] + bytes([o[3] & ~8]) + o[4:-5]
 add(o[:3] + bytes([o[3] | 8]) + o[4:], 'RXT bit set but no block')
-spec = importlib.util.spec_from_file_location('hb', os.path.join(here, 'hb21_py', 'hb21.py')); H = importlib.util.module_from_spec(spec); spec.loader.exec_module(H)
+spec = importlib.util.spec_from_file_location('hb', os.path.join(here, 'hb3_py', 'hb3.py')); H = importlib.util.module_from_spec(spec); spec.loader.exec_module(H)
 w = H.encode(b'N0CALL-9>APLRG1,WIDE1-1,WIDE2-2:!3722.40N/12158.93W>LoRa APRS iGate on the hill')     # the worked example's frame (35 bytes): see spec 11 "Worked example"
 assert len(w) == 35 and w[3] == 0x23
 def mut(frame, i, v): b = bytearray(frame); b[i] = v; return bytes(b)
@@ -89,4 +89,4 @@ def ppm_frame():
     crc = H.crc_wire(hdr, 0x00, b'', src6 + b'\x00', b'', len(txt), pay)
     return b'\x3c\xff\x03' + bytes([hdr]) + src6 + b'\x00' + bytes([0x00, len(txt), crc & 255, crc >> 8]) + pay
 add(ppm_frame(), 'PPM text holds a NUL byte (valid CRC over the bytes as sent)')
-sys.stdout.write('# Spec 12 rejection vectors (2.1.0-dev.1): <frame hex> <why it must be dropped>. Every receiver must drop each line.\n' + '\n'.join(out) + '\n')
+sys.stdout.write('# Spec 12 rejection vectors (3.0.0-dev.1): <frame hex> <why it must be dropped>. Every receiver must drop each line.\n' + '\n'.join(out) + '\n')

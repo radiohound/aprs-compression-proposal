@@ -1,4 +1,4 @@
-# Relay-without-the-model vectors (proposal 2.1.0-dev.1, a line with - - is a damaged frame that no relay may forward): <received frame hex> <pass-through relayed frame hex, or -> <relay that decodes, hex or ->. Relay N0RLY-1, tuple 50 20 45 10, first hop.
+# Relay-without-the-model vectors (proposal 3.0.0-dev.1, a line with - - is a damaged frame that no relay may forward): <received frame hex> <pass-through relayed frame hex, or -> <relay that decodes, hex or ->. Relay N0RLY-1, tuple 50 20 45 10, first hop.
 3cff0323874755da4c3a09121003ef9998938a5c6b04d0580143f62d8bb3efb93ded6dd7e191f0ea2de72e8b4775915a30c4735cd6a3aa 3cff032b874755da4c3aa159a392e8121003ef9998938a5c6b04d0580143f62d8bb3efb93ded6dd7e191f0ea2de72e8b4775915a30c4735cd6a3aa32142d0a81 -
 3cff0312805994a62c34120113be227a4b17df9fcf1ec808592c1ef096 3cff032a805994a62c34a159a392e8110113be227a4b17df9fcf1ec808592c1ef09632142d0a81 -
 3cff03138f5995b9570d09091dbf6db2ecf2505c5b447530010a9a24ccb885b56dd1b7 3cff031b8f5995b9570da159a392e8091dbf6db2ecf2505c5b447530010a9a24ccb885b56dd1b732142d0a81 -

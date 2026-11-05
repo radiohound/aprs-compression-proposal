@@ -1,10 +1,10 @@
 # What a new PPM model does to a mixed network
 
-*2.1.0-dev.1 (frame type `3C FF 03`, [spec 12](../spec/12-lacf-2.1-dev-byte-plan.md)): a proposal, not adopted; it needs F4MLV's agreement. Tables only; a diagram (stations as boxes, one arrow per row: green decodes, red dropped, amber the sender's choice or a pass-through) is still to be drawn.*
+*3.0.0-dev.1 (frame type `3C FF 03`, [spec 12](../spec/12-lacf-3.0-dev-byte-plan.md)): a proposal, not adopted; it needs F4MLV's agreement. Tables only; a diagram (stations as boxes, one arrow per row: green decodes, red dropped, amber the sender's choice or a pass-through) is still to be drawn.*
 
 **In one sentence:** a new PPM model never breaks old stations by itself. Old stations are cut off only from frames a sender **chooses** to encode with the new model; relays that have "Relay without the model" pass those frames on; old iGates cannot gate them. Plain frames and older models work everywhere, forever.
 
-"Old" means a station that holds model N; "new" means one that holds N and N+1. The model is the low five bits of `V` ([spec 12](../spec/12-lacf-2.1-dev-byte-plan.md)). The 2.0.0 frame (type `02`, spec 11) is a different frame type: a station that holds both decoders reads either, and a 2.0.0-only station never sees a type `03` frame.
+"Old" means a station that holds model N; "new" means one that holds N and N+1. The model is the low five bits of `V` ([spec 12](../spec/12-lacf-3.0-dev-byte-plan.md)). The 2.0.0 frame (type `02`, spec 11) is a different frame type: a station that holds both decoders reads either, and a 2.0.0-only station never sees a type `03` frame.
 
 ## A. Direct reception
 

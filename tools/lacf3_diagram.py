@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Draws docs/img/lacf-2.1-frame-layout.svg: the layout of a LACF 2.1.0-dev.1 frame (spec 12, frame type 03) and a worked example with real bytes.
+"""Draws docs/img/lacf-3.0-frame-layout.svg: the layout of a LACF 3.0.0-dev.1 frame (spec 12, frame type 03) and a worked example with real bytes.
 
-    python3 tools/lacf21_diagram.py > docs/img/lacf-2.1-frame-layout.svg
+    python3 tools/lacf3_diagram.py > docs/img/lacf-3.0-frame-layout.svg
 
-The example bytes come from the Python reference code (tools/hb21/hb21_py/hb21.py), so the picture cannot drift from the spec:
+The example bytes come from the Python reference code (tools/hb3/hb3_py/hb3.py), so the picture cannot drift from the spec:
 the frame is encoded and relayed by the reference, and its fields are read back from the parsed frame. Needs nothing else."""
 import os, sys
 from xml.sax.saxutils import escape
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "hb21", "hb21_py"))
-import hb21 as hb
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "hb3", "hb3_py"))
+import hb3 as hb
 
 PKT = b"N0CALL-9>APLRG1,WIDE1-1,WIDE2-2:!3722.40N/12158.93W>LoRa APRS iGate on the hill"
 frame = hb.encode(PKT)
@@ -38,11 +38,11 @@ def line(x1, y1, x2, y2, stroke=LINE, sw=1, dash=""):
 
 H = 0
 add(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-labelledby="t d">')
-add('<title id="t">LACF 2.1.0-dev.1 frame layout</title>')
+add('<title id="t">LACF 3.0.0-dev.1 frame layout</title>')
 add('<desc id="d">The fields of a LACF frame (LoRa APRS Compact Frame, spec 12 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>')
 rect(0, 0, W, 0, "#ffffff", stroke="#ffffff", rx=0)
-text(30, 38, "LACF 2.1.0-dev.1 frame layout (type 03)", 24, "bold")
-text(30, 60, "LoRa APRS Compact Frame 2.1.0-dev.1, frame type 03 (spec 12): a proposal, not adopted. The tested 2.0.0 frame is type 02 (spec 11). Sizes are in bytes.", 13, fill=MUTED)
+text(30, 38, "LACF 3.0.0-dev.1 frame layout (type 03)", 24, "bold")
+text(30, 60, "LoRa APRS Compact Frame 3.0.0-dev.1, frame type 03 (spec 12): a proposal, not adopted. The tested 2.0.0 frame is type 02 (spec 11). Sizes are in bytes.", 13, fill=MUTED)
 
 # ---------------------------------------------------------------- A. the fields
 text(30, 100, "1. The fields, in the order they are sent", 16, "bold")
@@ -114,7 +114,7 @@ for lbl, note in [("RSSI", "signal strength"), ("SNR", "signal to noise"), ("fre
     rect(tx, add_y + 10, 110, 34, C["tuple"]); text(tx + 55, add_y + 32, lbl, 12, "bold", anchor="middle"); text(tx + 55, add_y + 58, note, 11, fill=MUTED, anchor="middle"); tx += 113
 rect(tx + 6, add_y + 10, 150, 34, C["mask"]); text(tx + 81, add_y + 32, "mask", 12, "bold", anchor="middle"); text(tx + 81, add_y + 58, "bit 7 set; bits 0 to 6 name", 11, fill=MUTED, anchor="middle"); text(tx + 81, add_y + 72, "the path elements measured", 11, fill=MUTED, anchor="middle")
 
-# ---------------------------------------------------------------- B2. capability bytes (proposal 2.1.0-dev.1)
+# ---------------------------------------------------------------- B2. capability bytes (proposal 3.0.0-dev.1)
 cap_y = add_y + 112
 text(30, cap_y, "Capability bytes (4 bytes after V, only when V bit 7 is set; 32 bits, bit 31 first, sent about every 8th beacon):", 13, "bold")
 cx = 30
@@ -193,8 +193,8 @@ for i, (lbl, n, col, note) in enumerate(bars):
     yy = ys + 14 + i * 30
     rect(30, yy, n * 8, 20, col)
     text(30 + n * 8 + 10, yy + 15, f"{lbl}: {note}", 12)
-text(30, ys + 14 + 3 * 30 + 12, "Colours only group the bytes; every group is also named. Frame bytes come from the reference code (tools/hb21) and a different packet gives different bytes and sizes.", 11.5, fill=MUTED)
-text(30, ys + 14 + 3 * 30 + 30, "Spec: spec/12-lacf-2.1-dev-byte-plan.md (proposal). Developed with Fabrice Morel, F4MLV (moricef): his native LoRa APRS frame with K6ATV's PPM compression.", 11.5, fill=MUTED)
+text(30, ys + 14 + 3 * 30 + 12, "Colours only group the bytes; every group is also named. Frame bytes come from the reference code (tools/hb3) and a different packet gives different bytes and sizes.", 11.5, fill=MUTED)
+text(30, ys + 14 + 3 * 30 + 30, "Spec: spec/12-lacf-3.0-dev-byte-plan.md (proposal). Developed with Fabrice Morel, F4MLV (moricef): his native LoRa APRS frame with K6ATV's PPM compression.", 11.5, fill=MUTED)
 add("</svg>")
 body = "\n".join(out)
 H = int(MAXY + 24)

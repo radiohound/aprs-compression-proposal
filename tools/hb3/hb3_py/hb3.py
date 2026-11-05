@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Second, independent implementation of spec 12 (LACF 2.1.0-dev.1, frame type 3C FF 03), standard library only. The 2.0.0 frame (type 02, spec 11) is in tools/hb/hb_py/hb.py.
+"""Second, independent implementation of spec 12 (LACF 3.0.0-dev.1, frame type 3C FF 03), standard library only. The 2.0.0 frame (type 02, spec 11) is in tools/hb/hb_py/hb.py.
 
     python3 -I hb.py gen < packets.txt          '<frame hex or -> <packet hex>' per packet line
     python3 -I hb.py check vectors.txt          encode and decode against '<frame> <packet>' vectors
@@ -18,10 +18,10 @@ INFO_MODEL_PATH = os.path.join(TABLE_DIR, 'model_hybridB_info_native.c')
 COMMENT_MODEL_PATH = os.path.join(TABLE_DIR, 'model_hybridB_comment.c')
 DEST_LIST_PATH = os.path.join(TABLE_DIR, 'tocall_set1.txt')
 
-# Versions. SPEC_VERSION is the semantic version of spec 12: the proposal 2.1.0-dev.1 (not adopted, needs F4MLV's agreement), frame type 3C FF 03. The 2.0.0 frame (type 02) is a separate
+# Versions. SPEC_VERSION is the semantic version of spec 12: the proposal 3.0.0-dev.1 (not adopted, needs F4MLV's agreement), frame type 3C FF 03. The 2.0.0 frame (type 02) is a separate
 # codec (tools/hb/hb_py/hb.py). V = c ss mmmmm: c = four capability bytes follow V, ss two spare bits (sent 0, ignored), mmmmm the model version (the pair of PPM tables, 32 values).
 # The destination list is not versioned. The CRC is over the bytes as sent (see crc_wire), so a relay that does not hold the model can check it.
-SPEC_VERSION = '2.1.0-dev.1'
+SPEC_VERSION = '3.0.0-dev.1'
 MODEL_VERSION = 0
 KNOWN_MODELS = (0,)
 KNOWN_TABLES = KNOWN_MODELS                  # the old name, kept for the callers that still use it

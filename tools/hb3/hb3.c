@@ -1,4 +1,4 @@
-#include "hb21.h"
+#include "hb3.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,27 +11,27 @@ size_t hbc_payload_encode(const uint8_t *text, size_t tl, uint8_t *out, size_t c
 int    hbc_payload_check(const uint8_t *pay, size_t n, size_t L, uint8_t *text);
 
 #define MODEL_VERSION 0                     /* model version 0: the two PPM tables above (the destination list is not versioned: fixed, append-only codes) */
-#define VBYTE(has_cap) ((uint8_t)(((has_cap) ? 0x80 : 0) | MODEL_VERSION))   /* 2.1.0-dev.1 (proposal): V = c ss mmmmm, c = three capability bytes follow V, ss two spare bits (0), mmmmm the model version */
+#define VBYTE(has_cap) ((uint8_t)(((has_cap) ? 0x80 : 0) | MODEL_VERSION))   /* 3.0.0-dev.1 (proposal): V = c ss mmmmm, c = three capability bytes follow V, ss two spare bits (0), mmmmm the model version */
 #define MAX_LIST 126                        /* destination codes 0 to 125; 126 is reserved and 127 is the escape */
 static char list[MAX_LIST][12]; static int nlist = 0;
 
-const char *hb21_reason(int c)
+const char *hb3_reason(int c)
 {
     switch (c) {
-    case HB21_ERR_PREFIX: return "prefix"; case HB21_ERR_KIND: return "kind"; case HB21_ERR_RESERVED: return "reserved bit"; case HB21_ERR_FRONT: return "address or path";
-    case HB21_ERR_RXT: return "RXT block"; case HB21_ERR_VERSION: return "version or coding"; case HB21_ERR_CONTENT: return "content structure"; case HB21_ERR_PAYLOAD: return "payload is not canonical";
-    case HB21_ERR_CRC: return "CRC"; case HB21_ERR_SIZE: return "size rule"; case HB21_ERR_RANGE: return "tuple range"; case HB21_ERR_CODE_RESERVED: return "reserved destination code";
-    case HB21_ERR_POSITION: return "position block"; default: return "?"; }
+    case HB3_ERR_PREFIX: return "prefix"; case HB3_ERR_KIND: return "kind"; case HB3_ERR_RESERVED: return "reserved bit"; case HB3_ERR_FRONT: return "address or path";
+    case HB3_ERR_RXT: return "RXT block"; case HB3_ERR_VERSION: return "version or coding"; case HB3_ERR_CONTENT: return "content structure"; case HB3_ERR_PAYLOAD: return "payload is not canonical";
+    case HB3_ERR_CRC: return "CRC"; case HB3_ERR_SIZE: return "size rule"; case HB3_ERR_RANGE: return "tuple range"; case HB3_ERR_CODE_RESERVED: return "reserved destination code";
+    case HB3_ERR_POSITION: return "position block"; default: return "?"; }
 }
 
-uint16_t hb21_crc16(const uint8_t *p, size_t n)
+uint16_t hb3_crc16(const uint8_t *p, size_t n)
 {
     uint16_t c = 0xFFFF; size_t i; int b;
     for (i = 0; i < n; i++) { c ^= p[i]; for (b = 0; b < 8; b++) c = (c & 1) ? (uint16_t)((c >> 1) ^ 0x8408) : (uint16_t)(c >> 1); }
     return (uint16_t)~c;
 }
 
-int hb21_set_list(const char *const *names, int n)
+int hb3_set_list(const char *const *names, int n)
 {
     int i;
     if (n < 0 || n > MAX_LIST) return -1;
@@ -40,7 +40,7 @@ int hb21_set_list(const char *const *names, int n)
     return n;
 }
 
-int hb21_load_list(const char *path)
+int hb3_load_list(const char *path)
 {
     FILE *f = fopen(path, "r"); char line[128];
     if (!f) return -1;
@@ -320,7 +320,7 @@ static int tnc_parse(const char *s, size_t len, tnc_t *t)
 }
 
 #define CAPLEN 4                            /* capability bytes after V when V bit 7 is set */
-/* The CRC of the proposal 2.1.0-dev.1 is taken over the bytes as sent, so a relay that does not hold the model can check it: the header kind bits (header & 7), V, the capability
+/* The CRC of the proposal 3.0.0-dev.1 is taken over the bytes as sent, so a relay that does not hold the model can check it: the header kind bits (header & 7), V, the capability
  * bytes, the source and destination bytes (everything between the header and the path), the position block, L (LACF content only), and the payload or the plain text. The path and
  * the RXT block are not covered (relays change them), and the CRC field itself is left out. */
 static uint16_t crc_wire(uint8_t hdr, uint8_t V, const uint8_t *capb, const uint8_t *srcdest, size_t sdn, const uint8_t *pos, size_t pn, int has_L, uint8_t L, const uint8_t *body, size_t bn)
@@ -333,27 +333,27 @@ static uint16_t crc_wire(uint8_t hdr, uint8_t V, const uint8_t *capb, const uint
     if (pn) { memcpy(buf + w, pos, pn); w += pn; }
     if (has_L) buf[w++] = L;
     memcpy(buf + w, body, bn); w += bn;
-    return hb21_crc16(buf, w);
+    return hb3_crc16(buf, w);
 }
 
-static size_t rxt_bytes(const hb21_rxt_t *r, uint8_t *out)
+static size_t rxt_bytes(const hb3_rxt_t *r, uint8_t *out)
 {
     size_t w = 0; int k, j; uint8_t mask = 0x80;
     for (k = 0; k < r->n; k++) { for (j = 0; j < 4; j++) out[w++] = r->t[k][j]; mask |= (uint8_t)(1 << r->idx[k]); }
     out[w++] = mask; return w;
 }
 
-int hb21_path_ok(const char *tnc2, size_t len)
+int hb3_path_ok(const char *tnc2, size_t len)
 {
     tnc_t t; int k;
-    if (len > 600 || !tnc_parse(tnc2, len, &t)) return 1;                   /* other problems are for hb21_encode to report */
+    if (len > 600 || !tnc_parse(tnc2, len, &t)) return 1;                   /* other problems are for hb3_encode to report */
     for (k = 0; k < t.np; k++) if (!wide_compliant(t.path[k])) return 0;
     return 1;
 }
 
-size_t hb21_encode_cap(const char *tnc2, size_t len, const hb21_rxt_t *rxt, const uint8_t *capb, uint8_t *out, size_t cap, hb21_info_t *info)
+size_t hb3_encode_cap(const char *tnc2, size_t len, const hb3_rxt_t *rxt, const uint8_t *capb, uint8_t *out, size_t cap, hb3_info_t *info)
 {
-    tnc_t t; uint8_t front[300], posblk[32], content[300], pay[300]; char comment[300]; char back[600]; hb21_info_t bi;
+    tnc_t t; uint8_t front[300], posblk[32], content[300], pay[300]; char comment[300]; char back[600]; hb3_info_t bi;
     size_t w = 0, fw, fwsd, pw = 0, cw, n, clen = 0, L, k, wr, crcpos, bn; int kind = 2, cc = 1; const uint8_t *textp, *bodyp; uint8_t V = VBYTE(capb != NULL), hdr;
     if (len > 600 || !tnc_parse(tnc2, len, &t) || t.ilen > 255) return 0;     /* the limits are on the frame (255) and the information field (255), not on the plain text */
     { int k0; for (k0 = 0; k0 < t.np; k0++) if (!wide_compliant(t.path[k0])) return 0; }   /* a non-compliant WIDE path is dropped, not sent in any form */
@@ -407,51 +407,51 @@ size_t hb21_encode_cap(const char *tnc2, size_t len, const hb21_rxt_t *rxt, cons
     if (rxt && rxt->n) w += rxt_bytes(rxt, out + w);
     if (w > 255) return 0;
     /* never emit a frame that does not round-trip */
-    if (hb21_decode(out, w, back, sizeof back, &bi) != (int)len || memcmp(back, tnc2, len)) return 0;
+    if (hb3_decode(out, w, back, sizeof back, &bi) != (int)len || memcmp(back, tnc2, len)) return 0;
     if (info) *info = bi;
     return w;
 }
 
-size_t hb21_encode(const char *tnc2, size_t len, const hb21_rxt_t *rxt, uint8_t *out, size_t cap, hb21_info_t *info)
+size_t hb3_encode(const char *tnc2, size_t len, const hb3_rxt_t *rxt, uint8_t *out, size_t cap, hb3_info_t *info)
 {
-    return hb21_encode_cap(tnc2, len, rxt, NULL, out, cap, info);
+    return hb3_encode_cap(tnc2, len, rxt, NULL, out, cap, info);
 }
 
 /* structural = 1: the checks that need no model (the front, the position block, V, the RXT block); the content is not decoded and the destination code may be unassigned.
  * The returned text then holds only "src>dest,path:" (spec 11, "Relay without the model"). */
-static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb21_info_t *info, int structural)
+static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_info_t *info, int structural)
 {
     uint8_t hdr; int kind, npath, k, have_rxt = 0; size_t i = 4, cs, end = n, rxt_start, front_len, path_start;
-    char src[40], dest[40], path[15][40], prefix[96], comment[300], text[300], infof[700]; alt_t alt; hb21_rxt_t rx; int cc, ver, hascap, hasL = 0; uint8_t V, capb[CAPLEN] = {0, 0, 0, 0}; size_t b, bn, L = 0; const uint8_t *bodyp; uint16_t want;
+    char src[40], dest[40], path[15][40], prefix[96], comment[300], text[300], infof[700]; alt_t alt; hb3_rxt_t rx; int cc, ver, hascap, hasL = 0; uint8_t V, capb[CAPLEN] = {0, 0, 0, 0}; size_t b, bn, L = 0; const uint8_t *bodyp; uint16_t want;
     memset(&rx, 0, sizeof rx); alt.present = 0; prefix[0] = 0;
-    if (n < 6 || fr[0] != 0x3C || fr[1] != 0xFF || fr[2] != 0x03) return HB21_ERR_PREFIX;
+    if (n < 6 || fr[0] != 0x3C || fr[1] != 0xFF || fr[2] != 0x03) return HB3_ERR_PREFIX;
     hdr = fr[3]; kind = hdr & 3; npath = hdr >> 4;
-    if (hdr & 0x04) return HB21_ERR_RESERVED;                                 /* kinds 0 and 1 are plain content, 2 and 3 LACF content; kinds 1 and 3 have a position block */
-    if (!dec_element(fr, n, &i, src, sizeof src)) return HB21_ERR_FRONT;
-    if (i >= n) return HB21_ERR_FRONT;
+    if (hdr & 0x04) return HB3_ERR_RESERVED;                                 /* kinds 0 and 1 are plain content, 2 and 3 LACF content; kinds 1 and 3 have a position block */
+    if (!dec_element(fr, n, &i, src, sizeof src)) return HB3_ERR_FRONT;
+    if (i >= n) return HB3_ERR_FRONT;
     { uint8_t code = fr[i] & 0x7F;                                  /* bit 7 (c) is reserved and ignored */
-      if (code == 126) return HB21_ERR_CODE_RESERVED;
-      if (code == 127) { i++; if (!dec_element(fr, n, &i, dest, sizeof dest)) return HB21_ERR_FRONT; }
-      else { if (code >= nlist) { if (!structural) return HB21_ERR_FRONT; strcpy(dest, "?"); } else strcpy(dest, list[code]); i++; } }
+      if (code == 126) return HB3_ERR_CODE_RESERVED;
+      if (code == 127) { i++; if (!dec_element(fr, n, &i, dest, sizeof dest)) return HB3_ERR_FRONT; }
+      else { if (code >= nlist) { if (!structural) return HB3_ERR_FRONT; strcpy(dest, "?"); } else strcpy(dest, list[code]); i++; } }
     path_start = i;
-    for (k = 0; k < npath; k++) if (!dec_element(fr, n, &i, path[k], sizeof path[k]) || !wide_compliant(path[k])) return HB21_ERR_FRONT;
+    for (k = 0; k < npath; k++) if (!dec_element(fr, n, &i, path[k], sizeof path[k]) || !wide_compliant(path[k])) return HB3_ERR_FRONT;
     front_len = i;
-    if (kind & 1) { if (!pos_decode(fr, n, &i, prefix, sizeof prefix, &alt)) return HB21_ERR_POSITION; }
+    if (kind & 1) { if (!pos_decode(fr, n, &i, prefix, sizeof prefix, &alt)) return HB3_ERR_POSITION; }
     cs = i;
-    if (cs >= n) return HB21_ERR_CONTENT;
+    if (cs >= n) return HB3_ERR_CONTENT;
     /* RXT block at the end */
     if (hdr & 0x08) {
         uint8_t mask = fr[n - 1]; int kk = 0, j;
-        if (!(mask & 0x80)) return HB21_ERR_RXT;
-        for (j = 0; j < 7; j++) if (mask >> j & 1) { if (j >= npath) return HB21_ERR_RXT; kk++; }
-        if (kk < 1 || n < cs + 1 + ((fr[cs] & 0x80) ? CAPLEN : 0) + (size_t)(4 * kk + 1)) return HB21_ERR_RXT;
+        if (!(mask & 0x80)) return HB3_ERR_RXT;
+        for (j = 0; j < 7; j++) if (mask >> j & 1) { if (j >= npath) return HB3_ERR_RXT; kk++; }
+        if (kk < 1 || n < cs + 1 + ((fr[cs] & 0x80) ? CAPLEN : 0) + (size_t)(4 * kk + 1)) return HB3_ERR_RXT;
         rxt_start = n - (size_t)(4 * kk + 1);
         { size_t p = rxt_start; int t2 = 0;
           for (j = 0; j < 7; j++) {
               int q;
               if (!(mask >> j & 1)) continue;
               rx.idx[t2] = (uint8_t)j;
-              for (q = 0; q < 4; q++) { rx.t[t2][q] = fr[p++]; if (rx.t[t2][q] >= 0x80) return HB21_ERR_RANGE; }   /* 90 to 127 are unknown values (93 = not measured): the frame is kept */
+              for (q = 0; q < 4; q++) { rx.t[t2][q] = fr[p++]; if (rx.t[t2][q] >= 0x80) return HB3_ERR_RANGE; }   /* 90 to 127 are unknown values (93 = not measured): the frame is kept */
               t2++;
           }
           rx.n = kk; }
@@ -460,22 +460,22 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb21
     /* content */
     V = fr[cs]; cc = kind < 2 ? 3 : 0; ver = V & 31; hascap = V >> 7;      /* cc: 3 = plain (kinds 0 and 1), 0 = LACF (kinds 2 and 3) */
     b = cs + 1 + (hascap ? CAPLEN : 0);                                    /* the body starts after V and the capability bytes */
-    if (hascap) { if (b > end) return HB21_ERR_CONTENT; memcpy(capb, fr + cs + 1, CAPLEN); }
-    if (cc == 3) { if (end < b + 2) return HB21_ERR_CONTENT; want = (uint16_t)(fr[b] | fr[b + 1] << 8); bodyp = fr + b + 2; bn = end - b - 2; }
-    else { if (end < b + 4) return HB21_ERR_CONTENT; L = fr[b]; if (L < 1) return HB21_ERR_CONTENT; want = (uint16_t)(fr[b + 1] | fr[b + 2] << 8); bodyp = fr + b + 3; bn = end - b - 3; hasL = 1; }
+    if (hascap) { if (b > end) return HB3_ERR_CONTENT; memcpy(capb, fr + cs + 1, CAPLEN); }
+    if (cc == 3) { if (end < b + 2) return HB3_ERR_CONTENT; want = (uint16_t)(fr[b] | fr[b + 1] << 8); bodyp = fr + b + 2; bn = end - b - 2; }
+    else { if (end < b + 4) return HB3_ERR_CONTENT; L = fr[b]; if (L < 1) return HB3_ERR_CONTENT; want = (uint16_t)(fr[b + 1] | fr[b + 2] << 8); bodyp = fr + b + 3; bn = end - b - 3; hasL = 1; }
     /* the CRC is over the bytes as sent: it needs no model, so a relay without the model checks it too */
-    if (crc_wire(hdr, V, hascap ? capb : NULL, fr + 4, path_start - 4, fr + front_len, cs - front_len, hasL, (uint8_t)L, bodyp, bn) != want) return HB21_ERR_CRC;
+    if (crc_wire(hdr, V, hascap ? capb : NULL, fr + 4, path_start - 4, fr + front_len, cs - front_len, hasL, (uint8_t)L, bodyp, bn) != want) return HB3_ERR_CRC;
     if (structural) infof[0] = 0;
     else if (cc == 3) {                                                    /* plain content uses no model: the model bits are ignored */
         size_t tl = bn;
-        if (tl > 255) return HB21_ERR_CONTENT;
-        if (memchr(bodyp, 0, tl)) return HB21_ERR_CONTENT;                 /* strict: no NUL in a TNC2 packet */
+        if (tl > 255) return HB3_ERR_CONTENT;
+        if (memchr(bodyp, 0, tl)) return HB3_ERR_CONTENT;                 /* strict: no NUL in a TNC2 packet */
         if (kind & 1) { memcpy(comment, bodyp, tl); comment[tl] = 0; }
         else { memcpy(text, bodyp, tl); text[tl] = 0; }
         if (!(kind & 1)) { memcpy(infof, text, tl); infof[tl] = 0; }
         else {
             size_t off = alt.present ? alt.offset : 0;
-            if (alt.present && off > tl) return HB21_ERR_POSITION;
+            if (alt.present && off > tl) return HB3_ERR_POSITION;
             strcpy(infof, prefix);
             memcpy(infof + strlen(prefix), comment, off); infof[strlen(prefix) + off] = 0;
             if (alt.present) strcat(infof, alt.text);
@@ -484,16 +484,16 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb21
         if (info) { info->cc = 1; info->payload_len = 0; }
     } else {
         size_t pn = bn; int ok;
-        if (ver != MODEL_VERSION) return HB21_ERR_VERSION;                  /* LACF content needs the model */
+        if (ver != MODEL_VERSION) return HB3_ERR_VERSION;                  /* LACF content needs the model */
         ok = (kind == 3) ? hbc_payload_check(bodyp, pn, L, (uint8_t *)comment) : hbi_payload_check(bodyp, pn, L, (uint8_t *)text);
-        if (!ok) return HB21_ERR_PAYLOAD;
-        if (memchr(kind == 3 ? comment : text, 0, L)) return HB21_ERR_CONTENT;     /* strict: no NUL in a TNC2 packet */
+        if (!ok) return HB3_ERR_PAYLOAD;
+        if (memchr(kind == 3 ? comment : text, 0, L)) return HB3_ERR_CONTENT;     /* strict: no NUL in a TNC2 packet */
         if (kind == 3) comment[L] = 0; else text[L] = 0;
-        if (4 + pn >= 3 + L) return HB21_ERR_SIZE;
+        if (4 + pn >= 3 + L) return HB3_ERR_SIZE;
         if (kind == 2) { memcpy(infof, text, L); infof[L] = 0; }
         else {
             size_t off = alt.present ? alt.offset : 0;
-            if (alt.present && off > L) return HB21_ERR_POSITION;
+            if (alt.present && off > L) return HB3_ERR_POSITION;
             strcpy(infof, prefix);
             memcpy(infof + strlen(prefix), comment, off); infof[strlen(prefix) + off] = 0;
             if (alt.present) strcat(infof, alt.text);
@@ -505,22 +505,22 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb21
       w = (size_t)snprintf(tnc2, cap, "%s>%s", src, dest);
       for (q = 0; q < npath; q++) w += (size_t)snprintf(tnc2 + w, cap - w, ",%s", path[q]);
       w += (size_t)snprintf(tnc2 + w, cap - w, ":%s", infof);
-      if (w >= cap) return HB21_ERR_CONTENT;
+      if (w >= cap) return HB3_ERR_CONTENT;
       if (info) { info->kind = kind; info->ver = ver; info->npath = npath; info->frame_len = n; info->content_len = end - cs; info->front_len = front_len; info->path_start = path_start; info->content_start = cs; info->has_rxt = have_rxt; info->rxt = rx; info->has_cap = hascap; memcpy(info->cap, capb, CAPLEN); }
       return (int)w; }
 }
 
-int hb21_decode(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb21_info_t *info)
+int hb3_decode(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_info_t *info)
 {
     return decode_impl(fr, n, tnc2, cap, info, 0);
 }
 
-/* The relay, once the new path is known. fr is the received frame (accepted by hb21_decode: in is its info, t its text parsed); t2 is the same packet with the
+/* The relay, once the new path is known. fr is the received frame (accepted by hb3_decode: in is its info, t its text parsed); t2 is the same packet with the
  * relay's path: only the path may differ. Copies the source and the destination exactly as received, the position block and the content byte for byte, keeps the
  * tuples of the earlier hops (each moves with its path element), and appends the relay's tuple at the element ownCall* of the new path. */
-static size_t relay_core(const uint8_t *fr, size_t n, const hb21_info_t *in, const tnc_t *t, const tnc_t *t2, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
+static size_t relay_core(const uint8_t *fr, size_t n, const hb3_info_t *in, const tnc_t *t, const tnc_t *t2, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
 {
-    size_t i = 4, cs, end = n, w = 0, wr, pb = 0, from, fw = 4, base; int k, q, relay_idx = -1, own, np = t2->np; uint8_t hdr = fr[3]; char own_el[48]; hb21_rxt_t rx;
+    size_t i = 4, cs, end = n, w = 0, wr, pb = 0, from, fw = 4, base; int k, q, relay_idx = -1, own, np = t2->np; uint8_t hdr = fr[3]; char own_el[48]; hb3_rxt_t rx;
     uint8_t front[300];
     snprintf(own_el, sizeof own_el, "%s*", relay_call);
     for (k = 0; k < np; k++) if (!strcmp(t2->path[k], own_el)) { relay_idx = k; break; }
@@ -547,7 +547,7 @@ static size_t relay_core(const uint8_t *fr, size_t n, const hb21_info_t *in, con
         for (x = rx.n; x > pos; x--) { rx.idx[x] = rx.idx[x - 1]; memcpy(rx.t[x], rx.t[x - 1], 4); }
         rx.idx[pos] = (uint8_t)m; memcpy(rx.t[pos], in->rxt.t[q], 4); rx.n++;
     }
-    if (own && rx.n >= HB21_MAX_TUPLES) return 0;                              /* an eighth element or later adds no tuple, so it can relay a frame that already has seven */
+    if (own && rx.n >= HB3_MAX_TUPLES) return 0;                              /* an eighth element or later adds no tuple, so it can relay a frame that already has seven */
     /* new front */
     front[0] = 0x3C; front[1] = 0xFF; front[2] = 0x03;
     if (in->path_start < 4 || in->path_start - 4 > sizeof front - 4) return 0;
@@ -569,9 +569,9 @@ static size_t relay_core(const uint8_t *fr, size_t n, const hb21_info_t *in, con
     return w;
 }
 
-size_t hb21_relay_to(const uint8_t *fr, size_t n, const char *new_tnc2, size_t new_len, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
+size_t hb3_relay_to(const uint8_t *fr, size_t n, const char *new_tnc2, size_t new_len, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
 {
-    char tn[700]; hb21_info_t in; tnc_t t, t2; int len = hb21_decode(fr, n, tn, sizeof tn, &in);
+    char tn[700]; hb3_info_t in; tnc_t t, t2; int len = hb3_decode(fr, n, tn, sizeof tn, &in);
     if (len <= 0 || !tnc_parse(tn, (size_t)len, &t) || !tnc_parse(new_tnc2, new_len, &t2)) return 0;
     if (strcmp(t.src, t2.src) || strcmp(t.dest, t2.dest) || t.ilen != t2.ilen || memcmp(t.info, t2.info, t.ilen)) return 0;    /* only the path may differ */
     return relay_core(fr, n, &in, &t, &t2, relay_call, tuple, out, cap);
@@ -579,7 +579,7 @@ size_t hb21_relay_to(const uint8_t *fr, size_t n, const char *new_tnc2, size_t n
 
 static size_t relay_wide(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap, int structural)
 {
-    char tn[700]; hb21_info_t in; tnc_t t, t2; int len = decode_impl(fr, n, tn, sizeof tn, &in, structural);
+    char tn[700]; hb3_info_t in; tnc_t t, t2; int len = decode_impl(fr, n, tn, sizeof tn, &in, structural);
     int k, relay_idx = -1; char tmp[40];
     if (len <= 0 || !tnc_parse(tn, (size_t)len, &t)) return 0;
     t2 = t;
@@ -598,20 +598,20 @@ static size_t relay_wide(const uint8_t *fr, size_t n, const char *relay_call, co
     return relay_core(fr, n, &in, &t, &t2, relay_call, tuple, out, cap);
 }
 
-size_t hb21_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
+size_t hb3_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
 {
     return relay_wide(fr, n, relay_call, tuple, out, cap, 0);
 }
 
 /* "Relay without the model" (spec 12, Relay step 8): every structural check and the CRC (which is over the bytes as sent), no content decode, so a frame whose model or destination code the relay does not hold is forwarded. */
-size_t hb21_relay_passthrough(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
+size_t hb3_relay_passthrough(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
 {
     return relay_wide(fr, n, relay_call, tuple, out, cap, 1);
 }
 
 /* The capability bytes (spec 12): role 3 | model decoded 5 | SF 3 | BW 2 | CR 2 | power 6 | preset 5 | spare 6, 32 bits, most significant byte first. power = dBm (0 unknown, 1 to 63). */
 static const int cap_bits[7] = { 3, 5, 3, 2, 2, 6, 5 };
-int hb21_cap_pack(const int f[7], uint8_t out[4])
+int hb3_cap_pack(const int f[7], uint8_t out[4])
 {
     uint32_t v = 0; int i;
     for (i = 0; i < 7; i++) { if (f[i] < 0 || f[i] >= (1 << cap_bits[i])) return 0; v = (v << cap_bits[i]) | (uint32_t)f[i]; }
@@ -619,7 +619,7 @@ int hb21_cap_pack(const int f[7], uint8_t out[4])
     out[0] = (uint8_t)(v >> 24); out[1] = (uint8_t)(v >> 16); out[2] = (uint8_t)(v >> 8); out[3] = (uint8_t)v;
     return 1;
 }
-void hb21_cap_parse(const uint8_t b[4], int f[7])
+void hb3_cap_parse(const uint8_t b[4], int f[7])
 {
     uint32_t v = (uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3]; int i;
     v >>= 6;

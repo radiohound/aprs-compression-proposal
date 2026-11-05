@@ -1,4 +1,4 @@
-# Spec 12 rejection vectors (2.1.0-dev.1): <frame hex> <why it must be dropped>. Every receiver must drop each line.
+# Spec 12 rejection vectors (3.0.0-dev.1): <frame hex> <why it must be dropped>. Every receiver must drop each line.
 3cff033b874755da4c3aa159a392e8a259a392e8111003ef9998938a5c6b04d0580043492b8bb3efb93ded6dd7e191f0ea2de72e8b4775915a30c4735cd6a3aa32142d0a33152e0b03 mask has no marker bit (bit 7 clear)
 3cff033b874755da4c3aa159a392e8a259a392e8111003ef9998938a5c6b04d0580043492b8bb3efb93ded6dd7e191f0ea2de72e8b4775915a30c4735cd6a3aa32142d0a33152e0bc3 mask bit 6 set but the path has fewer elements
 3cff033b874755da4c3aa159a392e8a259a392e8111003ef9998938a5c6b04d0580043492b8bb3efb93ded6dd7e191f0ea2de72e8b4775915a30c4735cd6a3aa32142d0a33152e0b80 mask with no tuple bit (k = 0)

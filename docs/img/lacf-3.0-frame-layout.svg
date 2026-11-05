@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1417" viewBox="0 0 1100 1417" role="img" aria-labelledby="t d">
-<title id="t">LACF 2.1.0-dev.1 frame layout</title>
+<title id="t">LACF 3.0.0-dev.1 frame layout</title>
 <desc id="d">The fields of a LACF frame (LoRa APRS Compact Frame, spec 12 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>
 <rect x="0.0" y="0.0" width="1100.0" height="1417.0" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="1" />
-<text x="30.0" y="38.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#1f2328" text-anchor="start" >LACF 2.1.0-dev.1 frame layout (type 03)</text>
-<text x="30.0" y="60.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#59636e" text-anchor="start" >LoRa APRS Compact Frame 2.1.0-dev.1, frame type 03 (spec 12): a proposal, not adopted. The tested 2.0.0 frame is type 02 (spec 11). Sizes are in bytes.</text>
+<text x="30.0" y="38.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#1f2328" text-anchor="start" >LACF 3.0.0-dev.1 frame layout (type 03)</text>
+<text x="30.0" y="60.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#59636e" text-anchor="start" >LoRa APRS Compact Frame 3.0.0-dev.1, frame type 03 (spec 12): a proposal, not adopted. The tested 2.0.0 frame is type 02 (spec 11). Sizes are in bytes.</text>
 <text x="30.0" y="100.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="bold" fill="#1f2328" text-anchor="start" >1. The fields, in the order they are sent</text>
 <rect x="30.0" y="112.0" width="104.0" height="66.0" rx="4" fill="#d9d9d9" stroke="#8c959f" stroke-width="1" />
 <text x="82.0" y="137.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1f2328" text-anchor="middle" >Marker</text>
@@ -394,6 +394,6 @@
 <text x="320.0" y="1312.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1f2328" text-anchor="start" >LACF frame: 35 B, 57% smaller for this packet (real packets average about 44%)</text>
 <rect x="30.0" y="1327.0" width="352.0" height="20.0" rx="4" fill="#f9e08a" stroke="#8c959f" stroke-width="1" />
 <text x="392.0" y="1342.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1f2328" text-anchor="start" >LACF after one relay hop, with the RXT block: 44 B, against 83 B as text: 47% smaller for this packet</text>
-<text x="30.0" y="1369.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="normal" fill="#59636e" text-anchor="start" >Colours only group the bytes; every group is also named. Frame bytes come from the reference code (tools/hb21) and a different packet gives different bytes and sizes.</text>
-<text x="30.0" y="1387.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="normal" fill="#59636e" text-anchor="start" >Spec: spec/12-lacf-2.1-dev-byte-plan.md (proposal). Developed with Fabrice Morel, F4MLV (moricef): his native LoRa APRS frame with K6ATV's PPM compression.</text>
+<text x="30.0" y="1369.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="normal" fill="#59636e" text-anchor="start" >Colours only group the bytes; every group is also named. Frame bytes come from the reference code (tools/hb3) and a different packet gives different bytes and sizes.</text>
+<text x="30.0" y="1387.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="normal" fill="#59636e" text-anchor="start" >Spec: spec/12-lacf-3.0-dev-byte-plan.md (proposal). Developed with Fabrice Morel, F4MLV (moricef): his native LoRa APRS frame with K6ATV's PPM compression.</text>
 </svg>
