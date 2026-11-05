@@ -2,7 +2,7 @@
 
 > **Earlier format.** This draft describes the earlier whole-text frames (`3C FF 81`, `3C FF C1`), which are superseded for LoRa by LACF, [spec 11](11-native-ppm-frame-byte-plan.md), a draft in early development and still being reviewed for change.
 
-> **For LACF, the capability word is proposed to ride in the frame itself (2.1.0-dev.1, not adopted, needs F4MLV's agreement).** In [spec 11](11-native-ppm-frame-byte-plan.md), "Capability bytes", bit `c` of the `V` byte says that three capability bytes follow it. They are this draft's word with the model field widened to 5 bits, a 4-bit power field added, the role widened to 3 bits (with digipeater and iGate "late" tiers) and the explicit-frequency presets (30 and 31) dropped so that the length is fixed. What still applies here: the VHF/AFSK column and the preset idea, and the text and APRS-IS forms below. A separate capability frame (`3C FF 03`) is no longer the plan for LoRa.
+> **For LACF 2.1.0-dev.1, the capability word is proposed to ride in the frame itself (a proposal, not adopted, needs F4MLV's agreement).** In [spec 12](12-lacf-2.1-dev-byte-plan.md) it is a block of four bytes after the `V` byte (frame type `3C FF 03`), flagged by bit 7 of `V`: this draft's word with the model field widened to 5 bits, the power in whole dBm (6 bits), the role widened to 3 bits (with digipeater and iGate "late" tiers) and the explicit-frequency presets (30 and 31) dropped so that the length is fixed. What still applies here: the VHF/AFSK column and the preset idea, and the text and APRS-IS forms below. A separate capability frame is no longer the plan for LoRa.
 
 | | |
 |---|---|

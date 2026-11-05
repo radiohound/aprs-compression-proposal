@@ -9,13 +9,14 @@
 extern "C" {
 #endif
 #define HB_MAX_TUPLES 7
-#define HB_SPEC_VERSION "2.1.0-dev.1"   /* semantic version of spec 11: this file implements the proposal 2.1.0-dev.1 (not adopted); V = c ss mmmmm; MINOR = backward-compatible addition, PATCH = wording only */
+#define HB_SPEC_VERSION "2.0.0"   /* semantic version of spec 11: MAJOR = wire format version (low six bits of V), MINOR = backward-compatible addition, PATCH = wording only */
+#define HB_WIRE_VERSION 2
 typedef struct { int n; uint8_t idx[HB_MAX_TUPLES]; uint8_t t[HB_MAX_TUPLES][4]; } hb_rxt_t;     /* tuples in ascending path-element index */
-typedef struct { int kind, cc, ver, npath; size_t frame_len, content_len, payload_len, front_len, path_start, content_start; hb_rxt_t rxt; int has_rxt; int has_cap; uint8_t cap[3]; } hb_info_t;   /* ver = the model version (V bits 4-0) */
+typedef struct { int kind, cc, ver, npath; size_t frame_len, content_len, payload_len, front_len, path_start, content_start; hb_rxt_t rxt; int has_rxt; } hb_info_t;
 
 /* Reasons for a dropped frame (negative return of hb_decode). */
 enum { HB_ERR_PREFIX = -1, HB_ERR_KIND = -2, HB_ERR_RESERVED = -3, HB_ERR_FRONT = -4, HB_ERR_RXT = -5, HB_ERR_VERSION = -6, HB_ERR_CONTENT = -7,
-       HB_ERR_PAYLOAD = -8, HB_ERR_CRC = -9, HB_ERR_SIZE = -10, HB_ERR_RANGE = -11, HB_ERR_CODE_RESERVED = -12, HB_ERR_POSITION = -13 };
+       HB_ERR_PAYLOAD = -8, HB_ERR_CRC = -9, HB_ERR_SIZE = -10, HB_ERR_RANGE = -11, HB_ERR_CODE62 = -12, HB_ERR_POSITION = -13 };
 const char *hb_reason(int code);
 
 int  hb_set_list(const char *const *names, int n);   /* the same list given as an array (for firmware without files); returns n or -1 */
@@ -24,11 +25,6 @@ uint16_t hb_crc16(const uint8_t *p, size_t n);   /* CRC-16/X-25, check value of 
 
 /* Encode a TNC2 packet ("SRC>DST,PATH:INFO"); returns the frame length, or 0 if it cannot be encoded (the caller then sends a plain frame). rxt may be NULL. */
 size_t hb_encode(const char *tnc2, size_t len, const hb_rxt_t *rxt, uint8_t *out, size_t cap, hb_info_t *info);
-/* The same with three capability bytes (V bit 7 is then set and the bytes follow V); capb may be NULL. */
-size_t hb_encode_cap(const char *tnc2, size_t len, const hb_rxt_t *rxt, const uint8_t *capb, uint8_t *out, size_t cap, hb_info_t *info);
-/* The capability bytes: f = { role, model, sf, bw, cr, power, preset }; hb_cap_pack returns 0 if a field is out of range. */
-int  hb_cap_pack(const int f[7], uint8_t out[3]);
-void hb_cap_parse(const uint8_t b[3], int f[7]);
 
 /* 0 if the path of the TNC2 packet holds a WIDEn-N that breaks the APRS rule (n 1 to 7, N 1 to n), otherwise 1. Such a packet is dropped: hb_encode refuses it, and the caller
  * must NOT fall back to sending it as plain text or relaying it on RF (spec 11, "Non-compliant WIDE paths"). */
@@ -40,9 +36,6 @@ int hb_decode(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb_info_t *in
 /* Relay (spec 11 "Relay"): the frame must already be accepted by hb_decode. Rewrites the path (WIDE1-1 as first unused hop becomes relay_call*; WIDE2-2 becomes
  * relay_call*,WIDE2-1), copies the position block and the content field byte for byte, and appends the relay's tuple. Returns the new length, or 0. */
 size_t hb_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
-/* "Relay without the model": the same, but the frame need not be accepted by hb_decode: only the structural checks are made (no model, no content CRC), so a frame whose
- * model or destination code the relay does not hold is forwarded, content field byte for byte. The relay must not show, upload or use such a frame. */
-size_t hb_relay_passthrough(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
 
 /* The same relay with the new path chosen by the caller, for a digipeater with its own rules: new_tnc2 is the received packet with the path as the relay sends it (it
  * holds relay_call + "*" as the element the relay used); source, destination and information field must be those of the received frame. Copies the source and the
