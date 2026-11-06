@@ -26,7 +26,7 @@ static size_t raw_decode(const uint8_t *ref, size_t rl, const uint8_t *f, size_t
 static long n_cases, n_same, n_wrong, w_S, w_T, w_C, w_ST, w_SC, w_STC, w_TC, n_intact, n_intact_C;
 static void judge(const uint8_t *ref, size_t rl, const uint8_t *frame, size_t fl, const uint8_t *text, size_t tl)
 {
-    uint8_t back[300], again[400]; size_t bl = raw_decode(ref, rl, frame, fl, back), al;
+    uint8_t back[300] = {0}, again[400]; size_t bl = raw_decode(ref, rl, frame, fl, back), al;
     int S, T, C;
     n_cases++;
     if (bl == tl && !memcmp(back, text, tl)) { n_same++; return; }          /* wrong reference, right text anyway: harmless */

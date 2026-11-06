@@ -9,6 +9,7 @@
 static uint64_t st = 88172645463325252ULL;
 static uint32_t rnd(void) { st ^= st << 13; st ^= st >> 7; st ^= st << 17; return (uint32_t)(st >> 11); }
 int main(int argc, char **argv) {
+    (void)argc;
     FILE *f = fopen(argv[1], "r"); char line[1000]; static uint8_t frames[4000][256]; static size_t fl[4000]; int nf = 0;
     long trials = atol(argv[2]), acc = 0, t; char tn[900];
     if (hb_load_list("tools/hybrid/tables/tocall_set1.txt") != 62) return 2;
