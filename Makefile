@@ -76,6 +76,39 @@ hb-vectors: build/hb_test
 	( echo "# Spec 11 relay vectors, second and later hops (the received frame already carries k tuples): <received frame hex> <relayed frame hex> <relayed TNC2 hex>. Relay N0RLY-(k+1), tuple bytes 50+k 20+k 45+k 10+k, rules in spec 11 Conformance."; build/hb_test relaychain < test/hb_packets.txt ) > test/vectors_hb_relay_chain_v1.txt
 	python3 tools/hb/gen_relay_edge.py > test/vectors_hb_relay_edge_v1.txt
 
+# spec 12, the proposal 3.0.0-dev.1 (frame type 3C FF 03; the 2.0.0 frame above is untouched): build, vectors, fault injection on generated packets
+build/hb3_test: tools/hb3/hb3.c tools/hb3/hb3.h tools/hb/hbi.c tools/hb/hbc.c tools/hb/hb_payload.h tools/hb3/hb3_test.c $(SRC)
+	@mkdir -p build
+	$(CC) $(CFLAGS) -c tools/hb/hbi.c -o build/hbi.o
+	$(CC) $(CFLAGS) -c tools/hb/hbc.c -o build/hbc.o
+	$(CC) $(CFLAGS) -Itools/hb3 -c tools/hb3/hb3.c -o build/hb3.o
+	$(CC) $(CFLAGS) -Itools/hb3 tools/hb3/hb3_test.c build/hb3.o build/hbi.o build/hbc.o -o $@
+
+hb3-test: build/hb3_test
+	build/hb3_test check test/vectors_hb3_v1.txt
+	build/hb3_test relaycheck test/vectors_hb3_relay_v1.txt
+	build/hb3_test relaycheck test/vectors_hb3_relay_chain_v1.txt
+	build/hb3_test relaycheck test/vectors_hb3_relay_edge_v1.txt
+	build/hb3_test relaytocheck test/vectors_hb3_relay_v1.txt
+	build/hb3_test relaytocheck test/vectors_hb3_relay_chain_v1.txt
+	build/hb3_test relaytocheck test/vectors_hb3_relay_edge_v1.txt
+	build/hb3_test capcheck test/vectors_hb3_cap_v1.txt
+	build/hb3_test passcheck test/vectors_hb3_passthrough_v1.txt
+	@n=$$(grep -v '^#' test/vectors_hb3_reject_v1.txt | awk '{print $$1}' | build/hb3_test recv | grep -vc '^-$$'); echo "rejection vectors: $$n accepted (must be 0)"; test "$$n" = 0
+	python3 tools/hb/gen_packets.py 3000 > build/hb_packets.txt
+	build/hb3_test props build/hb_packets.txt
+
+hb3-vectors: build/hb3_test
+	python3 tools/hb/gen_packets.py 500 > test/hb_packets.txt
+	grep -v '^#' test/hb_edge_packets.txt >> test/hb_packets.txt
+	build/hb3_test gen < test/hb_packets.txt > test/vectors_hb3_v1.txt
+	( echo "# Spec 12 relay vectors, first hop: <received frame hex> <relayed frame hex> <relayed TNC2 hex>. Relay N0RLY-1, tuple bytes 50 20 45 10."; build/hb3_test relaygen < test/hb_packets.txt ) > test/vectors_hb3_relay_v1.txt
+	( echo "# Spec 12 relay vectors, second and later hops (the received frame already carries k tuples): <received frame hex> <relayed frame hex> <relayed TNC2 hex>. Relay N0RLY-(k+1), tuple bytes 50+k 20+k 45+k 10+k."; build/hb3_test relaychain < test/hb_packets.txt ) > test/vectors_hb3_relay_chain_v1.txt
+	python3 tools/hb3/gen_relay_edge.py > test/vectors_hb3_relay_edge_v1.txt
+	python3 tools/hb3/gen_reject.py > test/vectors_hb3_reject_v1.txt
+	python3 tools/hb3/gen_cap.py < test/hb_packets.txt > test/vectors_hb3_cap_v1.txt
+	python3 tools/hb3/gen_passthrough.py < test/hb_packets.txt > test/vectors_hb3_passthrough_v1.txt
+
 clean:
 	rm -rf build
-.PHONY: test vectors clean integrity lacf-ending lacf-vectors fast-freq hb-test hb-vectors
+.PHONY: test vectors clean integrity lacf-ending lacf-vectors fast-freq hb-test hb-vectors hb3-test hb3-vectors

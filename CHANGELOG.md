@@ -2,6 +2,20 @@
 
 LACF (spec 11) uses semantic versions: MAJOR = wire format version (the low six bits of `V`), MINOR = backward-compatible addition, PATCH = wording only. See "Versions" in `spec/11-native-ppm-frame-byte-plan.md`. The current number is in the file `VERSION`.
 
+## Unreleased - 3.0.0-dev.1, 5 November 2026 (a proposal: not adopted, every change needs F4MLV's agreement)
+
+**A separate frame type, `3C FF 03`, described in [spec 12](spec/12-lacf-3.0-dev-byte-plan.md).** The 2.0.0 frame (`3C FF 02`, spec 11) is unchanged and stays the tested baseline: its spec, byte reference, picture, codec (`tools/hb`) and vectors are as they were. The proposal has its own codec (`tools/hb3`, C and Python), vectors (`test/vectors_hb3_*.txt`), byte reference, picture and layout page. A device can hold both decoders (they share the PPM tables). `VERSION`, the firmware (iGate, tracker, Pi software), the README notice and the firmware page are still 2.0.0.
+
+1. **`V = c ss mmmmm`** instead of `vvvvv ttt`: a capability flag, two spare bits and a 5-bit model version (32 models). The frame type is the generation. Plain frames ignore the model bits.
+2. **Destination byte `c iiiiiii`:** 128 fixed, append-only codes (0 to 125 listed, 126 reserved, 127 the escape), no longer ranked and not versioned by `V`; one reserved bit.
+3. **The CRC is over the bytes as sent** (the kind bits, `V`, the capability bytes, the source and destination bytes, the position block, `L` and the payload or text), not over the decoded text, so that a relay that does not hold the model can check it. No extra bytes.
+4. **RXT:** 93 (`~`) means "not measured"; 90 to 127 other than 93 are unknown and the frame is kept; 0x80 or more still drops it.
+5. **Relay without the model:** a relay that does not hold a frame's model checks the structure and the CRC, forwards the frame byte for byte, adds its own tuple, and does not show or use it. The spec states what it cannot check.
+6. **Capability bytes:** four bytes after `V` when `c` is set: role (3 bits, with digipeater and iGate "late" tiers), model decoded (5), SF (3), BW (2), CR (2), **power in whole dBm (6 bits, 1 to 63)**, preset (5; 433.775, 439.9125 UK, 434.855 Poland), six spare bits. Sent about every 8th beacon. (The first draft had a 4-bit power field of odd values only, which could not give 20 or 22 dBm; F4MLV pointed that out.)
+7. Measured with the C reference on 3,000 generated packets: every cut, every appended-bytes case and every single-bit flip is rejected exactly as with the 2.0.0 CRC (outside the path, which no CRC covers). The C and Python references agree on every vector file.
+8. Decided not to: use destination code 126 for a packed `APL` plus three characters (only about 0.5% of real LoRa APRS packets would use it); a separate capability frame.
+9. Still open: placeholder names in the destination list, the frequency-offset range (to be discussed with Jon), how a sender chooses a model, how a receiver carries a missing RXT value to its display, the UK and Poland presets.
+
 ## 2.0.0 - 2 November 2026 (protocol version 2, table version 0)
 
 **Breaking.** Three changes to the bytes:
