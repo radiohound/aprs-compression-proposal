@@ -391,7 +391,8 @@ size_t hb3_encode_cap(const char *tnc2, size_t len, const hb3_rxt_t *rxt, const 
     /* front */
     hdr = (uint8_t)((t.np << 4) | ((rxt && rxt->n) ? 0x08 : 0) | (cc == 1 ? kind - 2 : kind));
     front[0] = 0x3C; front[1] = 0xFF; front[2] = 0x03; front[3] = hdr; fw = 4;
-    if (!enc_element(t.src, front + fw, sizeof front - fw, &wr)) return 0; fw += wr;
+    if (!enc_element(t.src, front + fw, sizeof front - fw, &wr)) return 0;
+    fw += wr;
     { int i, idx = -1; for (i = 0; i < nlist; i++) if (!strcmp(list[i], t.dest)) { idx = i; break; }
       if (idx >= 0) front[fw++] = (uint8_t)idx;
       else { front[fw++] = 127; if (!enc_element(t.dest, front + fw, sizeof front - fw, &wr)) return 0; fw += wr; } }
@@ -479,7 +480,7 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_
             strcpy(infof, prefix);
             memcpy(infof + strlen(prefix), comment, off); infof[strlen(prefix) + off] = 0;
             if (alt.present) strcat(infof, alt.text);
-            strncat(infof, comment + off, tl - off);
+            { size_t cur = strlen(infof); memcpy(infof + cur, comment + off, tl - off); infof[cur + tl - off] = 0; }
         }
         if (info) { info->cc = 1; info->payload_len = 0; }
     } else {
@@ -497,7 +498,7 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_
             strcpy(infof, prefix);
             memcpy(infof + strlen(prefix), comment, off); infof[strlen(prefix) + off] = 0;
             if (alt.present) strcat(infof, alt.text);
-            strncat(infof, comment + off, L - off);
+            { size_t cur = strlen(infof); memcpy(infof + cur, comment + off, L - off); infof[cur + L - off] = 0; }
         }
         if (info) { info->cc = 0; info->payload_len = pn; }
     }
