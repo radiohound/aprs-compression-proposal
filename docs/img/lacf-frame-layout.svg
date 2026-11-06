@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1315" viewBox="0 0 1100 1315" role="img" aria-labelledby="t d">
 <title id="t">LACF frame layout</title>
-<desc id="d">The fields of a LACF frame (LoRa APRS Compact Frame, spec 11 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>
+<desc id="d">The fields of a LACF 2.0.0 frame (LoRa APRS Compact Frame, spec 11 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>
 <rect x="0.0" y="0.0" width="1100.0" height="1315.0" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="1" />
 <text x="30.0" y="38.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#1f2328" text-anchor="start" >LACF frame layout</text>
-<text x="30.0" y="60.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#59636e" text-anchor="start" >LoRa APRS Compact Frame, spec 11 draft. A draft in early development; the format may change. Sizes are in bytes.</text>
+<text x="30.0" y="60.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#59636e" text-anchor="start" >LoRa APRS Compact Frame 2.0.0, spec 11 draft. A draft in early development; the format may change. Sizes are in bytes.</text>
 <text x="30.0" y="100.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="bold" fill="#1f2328" text-anchor="start" >1. The fields, in the order they are sent</text>
 <rect x="30.0" y="112.0" width="104.0" height="66.0" rx="4" fill="#d9d9d9" stroke="#8c959f" stroke-width="1" />
 <text x="82.0" y="137.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1f2328" text-anchor="middle" >Marker</text>
@@ -72,8 +72,9 @@
 <text x="803.0" y="196.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >The text of the packet (or the</text>
 <text x="803.0" y="210.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >comment after a position), coded by</text>
 <text x="803.0" y="224.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >PPM. V = protocol and table version,</text>
-<text x="803.0" y="238.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >L = length, CRC-16 over the text and</text>
-<text x="803.0" y="252.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >addresses.</text>
+<text x="803.0" y="238.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >L = length. CRC-16 covers the text,</text>
+<text x="803.0" y="252.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >kind, V, source and destination; the</text>
+<text x="803.0" y="266.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >path is excluded.</text>
 <rect x="920.0" y="112.0" width="148.0" height="66.0" rx="4" fill="#f9e08a" stroke="#8c959f" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="994.0" y="137.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1f2328" text-anchor="middle" >RXT block</text>
 <text x="994.0" y="155.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1f2328" text-anchor="middle" >4 B per hop + 1</text>
@@ -124,7 +125,7 @@
 <text x="311.0" y="568.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >of the sender</text>
 <rect x="369.0" y="520.0" width="110.0" height="34.0" rx="4" fill="#f9e08a" stroke="#8c959f" stroke-width="1" />
 <text x="424.0" y="542.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1f2328" text-anchor="middle" >time to hop</text>
-<text x="424.0" y="568.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >wait in the relay</text>
+<text x="424.0" y="568.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >end RX to end TX</text>
 <rect x="488.0" y="520.0" width="150.0" height="34.0" rx="4" fill="#e8c24a" stroke="#8c959f" stroke-width="1" />
 <text x="563.0" y="542.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#1f2328" text-anchor="middle" >mask</text>
 <text x="563.0" y="568.0" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#59636e" text-anchor="middle" >bit 7 set; bits 0 to 6 name</text>

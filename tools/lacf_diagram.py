@@ -39,10 +39,10 @@ def line(x1, y1, x2, y2, stroke=LINE, sw=1, dash=""):
 H = 0
 add(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-labelledby="t d">')
 add('<title id="t">LACF frame layout</title>')
-add('<desc id="d">The fields of a LACF frame (LoRa APRS Compact Frame, spec 11 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>')
+add('<desc id="d">The fields of a LACF 2.0.0 frame (LoRa APRS Compact Frame, spec 11 draft) and a worked example: a position beacon of 82 bytes as plain text is 35 bytes as a LACF frame and 44 bytes after one relay hop.</desc>')
 rect(0, 0, W, 0, "#ffffff", stroke="#ffffff", rx=0)
 text(30, 38, "LACF frame layout", 24, "bold")
-text(30, 60, "LoRa APRS Compact Frame, spec 11 draft. A draft in early development; the format may change. Sizes are in bytes.", 13, fill=MUTED)
+text(30, 60, "LoRa APRS Compact Frame 2.0.0, spec 11 draft. A draft in early development; the format may change. Sizes are in bytes.", 13, fill=MUTED)
 
 # ---------------------------------------------------------------- A. the fields
 text(30, 100, "1. The fields, in the order they are sent", 16, "bold")
@@ -72,7 +72,7 @@ for name, size, sub, key, w, notes in fields:
             text(px + pw / 2, y0 + 46, sz, 11, fill=MUTED, anchor="middle")
             px += pw
         text(x + w / 2, y0 - 6, "Content field", 13, "bold", anchor="middle")
-        wr = textwrap.wrap("The text of the packet (or the comment after a position), coded by PPM. V = protocol and table version, L = length, CRC-16 over the text and addresses.", int(w / 6.1))
+        wr = textwrap.wrap("The text of the packet (or the comment after a position), coded by PPM. V = protocol and table version, L = length. CRC-16 covers the text, kind, V, source and destination; the path is excluded.", int(w / 6.1))
         maxlines = max(maxlines, len(wr))
         for i, s_ in enumerate(wr):
             text(x + w / 2, y0 + bh + 18 + 14 * i, s_, 11, fill=MUTED, anchor="middle")
@@ -110,7 +110,7 @@ bits(580, yb + 28, [("vvvvv", 5, ["protocol version", "(2 today)"], C["vlc"]), (
 add_y = yb + 28 + 124
 text(30, add_y, "RXT tuple (4 bytes per relay, then one mask byte at the very end):", 13, "bold")
 tx = 30
-for lbl, note in [("RSSI", "signal strength"), ("SNR", "signal to noise"), ("freq. offset", "of the sender"), ("time to hop", "wait in the relay")]:
+for lbl, note in [("RSSI", "signal strength"), ("SNR", "signal to noise"), ("freq. offset", "of the sender"), ("time to hop", "end RX to end TX")]:
     rect(tx, add_y + 10, 110, 34, C["tuple"]); text(tx + 55, add_y + 32, lbl, 12, "bold", anchor="middle"); text(tx + 55, add_y + 58, note, 11, fill=MUTED, anchor="middle"); tx += 113
 rect(tx + 6, add_y + 10, 150, 34, C["mask"]); text(tx + 81, add_y + 32, "mask", 12, "bold", anchor="middle"); text(tx + 81, add_y + 58, "bit 7 set; bits 0 to 6 name", 11, fill=MUTED, anchor="middle"); text(tx + 81, add_y + 72, "the path elements measured", 11, fill=MUTED, anchor="middle")
 

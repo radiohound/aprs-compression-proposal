@@ -49,7 +49,7 @@ predicted from the three before it.
 ### The current format: LACF (spec 11)
 
 LACF, the *LoRa APRS Compact Frame*, is the native LoRa APRS frame (`3C FF 02`) with a PPM-coded **content field**: the addresses and path are packed into a few bytes,
-and only the text of the packet (or the comment after a position) is compressed, with a CRC-16 over the text and the addresses so a damaged or cut frame is dropped, not
+and only the text of the packet (or the comment after a position) is compressed, with a CRC-16 over the text, kind bits, `V`, source and destination (the mutable path is excluded) so a damaged or cut frame is dropped, not
 mis-read. A relay adds an optional **RXT block** (what each hop heard: signal strength, signal-to-noise, frequency offset, time to hop) at the end without touching the content. Stations that do not
 know the frame ignore it. The byte plan is [spec 11](spec/11-native-ppm-frame-byte-plan.md), a draft.
 

@@ -1,6 +1,6 @@
 # What a LACF frame looks like
 
-LACF (LoRa APRS Compact Frame, [spec 11](../spec/11-native-ppm-frame-byte-plan.md)) is a draft in early development, and the format may change. This page shows the layout once as a picture and once as tables, then follows one real packet byte by byte.
+LACF 2.0.0 (LoRa APRS Compact Frame, [spec 11](../spec/11-native-ppm-frame-byte-plan.md)) is a draft in early development, and the format may change. This page shows the layout once as a picture and once as tables, then follows one real packet byte by byte.
 
 ![The fields of a LACF frame, the header and V bytes, the RXT block, and a worked example of 35 bytes, and 44 bytes after one relay hop](img/lacf-frame-layout.svg)
 
