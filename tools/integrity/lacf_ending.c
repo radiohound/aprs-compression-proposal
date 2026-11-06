@@ -34,7 +34,7 @@ static int vectors(int check, const char *path)
 {
     char line[1000]; FILE *f = check ? fopen(path, "r") : stdin; int bad = 0, cnt = 0;
     if (!f) { perror(path); return 2; }
-    if (!check) printf("# LACF test vectors (spec/11 payload rules): model v1 table, LACF ending. Format: <frame hex or -> <text hex>\n");
+    if (!check) printf("# Test vectors for the PPM payload rules of spec/11 on a whole-text TEST frame (3C FF 81, 6 byte header; not a format): model v1 table, deterministic ending. Format: <frame hex or -> <text hex>\n");
     while (fgets(line, sizeof line, f)) {
         uint8_t text[400], fr[400], want[400], back[300]; size_t tl = 0, fl, wl = 0, pay; char *sp;
         if (line[0] == '#' || line[0] == '\n') continue;
