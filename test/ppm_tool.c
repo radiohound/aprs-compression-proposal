@@ -43,8 +43,10 @@ static int gen(void)
     buf[0] = 'A'; emit(buf, 1);
     memset(buf, 'A', 255); emit(buf, 255);
     memset(buf, 0, 40); emit(buf, 40);
-    for (i = 0; i < 255; i++) buf[i] = (uint8_t)(i + 1); emit(buf, 255);
-    for (i = 0; i < 100; i++) buf[i] = (uint8_t)((i * 37 + 11) & 0xFF); emit(buf, 100);
+    for (i = 0; i < 255; i++) buf[i] = (uint8_t)(i + 1);
+    emit(buf, 255);
+    for (i = 0; i < 100; i++) buf[i] = (uint8_t)((i * 37 + 11) & 0xFF);
+    emit(buf, 100);
     memcpy(buf, "`c5Zl\x1c>/\"4}=", 12); emit(buf, 12);
     return 0;
 }
