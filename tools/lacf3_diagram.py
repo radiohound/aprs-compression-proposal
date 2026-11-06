@@ -110,7 +110,7 @@ bits(580, yb + 28, [("c", 1, ["capability", "bytes follow"], "#eeeeee"), ("ss", 
 add_y = yb + 28 + 124
 text(30, add_y, "RXT tuple (4 bytes per relay, then one mask byte at the very end):", 13, "bold")
 tx = 30
-for lbl, note in [("RSSI", "signal strength"), ("SNR", "signal to noise"), ("freq. offset", "of the sender"), ("time to hop", "wait in the relay")]:
+for lbl, note in [("RSSI", "signal strength"), ("SNR", "signal to noise"), ("freq. offset", "of the sender"), ("time to hop", "end RX to end TX")]:
     rect(tx, add_y + 10, 110, 34, C["tuple"]); text(tx + 55, add_y + 32, lbl, 12, "bold", anchor="middle"); text(tx + 55, add_y + 58, note, 11, fill=MUTED, anchor="middle"); tx += 113
 rect(tx + 6, add_y + 10, 150, 34, C["mask"]); text(tx + 81, add_y + 32, "mask", 12, "bold", anchor="middle"); text(tx + 81, add_y + 58, "bit 7 set; bits 0 to 6 name", 11, fill=MUTED, anchor="middle"); text(tx + 81, add_y + 72, "the path elements measured", 11, fill=MUTED, anchor="middle")
 
