@@ -15,6 +15,7 @@ LACF (spec 11) uses semantic versions: MAJOR = wire format version (the low six 
 7. Measured with the C reference on 3,000 generated packets: every cut, every appended-bytes case and every single-bit flip is rejected exactly as with the 2.0.0 CRC (outside the path, which no CRC covers). The C and Python references agree on every vector file.
 8. Decided not to: use destination code 126 for a packed `APL` plus three characters (only about 0.5% of real LoRa APRS packets would use it); a separate capability frame.
 9. Still open: placeholder names in the destination list, the frequency-offset range (to be discussed with Jon), how a sender chooses a model, how a receiver carries a missing RXT value to its display, the UK and Poland presets.
+10. Possible later steps, not part of the proposal and not decided: firmware segmentation for over-the-air updates, a library for LACF, and where the firmware work lives. See [docs/future-work.md](docs/future-work.md).
 
 ## 2.0.0 - 2 November 2026 (protocol version 2, table version 0)
 

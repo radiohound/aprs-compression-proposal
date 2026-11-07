@@ -192,6 +192,7 @@ one would be welcome. They are not part of the Direwolf LoRa driver pull request
 * [LACF: airtime saved and processor time](docs/hybrid-savings-and-timing.md): measured on 14,305 real packets and on an ESP32, with the relayed-traffic effect
 * [Questions and answers](docs/faq.md): does it still work on normal LoRa APRS, what reaches APRS-IS, what a stock iGate does
 * [How it works, in plain language](docs/how-it-works.md) and [why not 438 or an off-the-shelf compressor](docs/alternatives-considered.md)
+* [Possible later steps around 3.0.0](docs/future-work.md): firmware segmentation for over-the-air updates, a library for LACF, where the firmware work lives (ideas only)
 * [The over-the-air test log](docs/over-the-air-test.md), with a section updated as the long run continues
 * [Everything else: all specs, simulation tables, roadmap, VHF notes](DETAILS.md)
 
