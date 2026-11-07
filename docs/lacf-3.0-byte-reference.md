@@ -170,7 +170,7 @@ Four bytes after `V`, one 32-bit number, most significant byte first. They descr
 | Bits (31 first) | Field | Values |
 |---|---|---|
 | 31-29 | role | 0 transmit only, 1 listens, 2 digipeater, 3 digipeater late, 4 iGate (no RF relay), 5 iGate and digipeater, 6 iGate and digipeater late, 7 reserved |
-| 28-24 | model decoded | the newest model the station decodes; 0 = plain only |
+| 28-24 | model decoded | 0 = plain content only; otherwise the newest model the station decodes plus one (model 0 is sent as 1) |
 | 23-21 | SF | 0 to 7 = SF5 to SF12 |
 | 20-19 | BW | 62.5 / 125 / 250 / 500 kHz |
 | 18-17 | CR | 4/5, 4/6, 4/7, 4/8 |

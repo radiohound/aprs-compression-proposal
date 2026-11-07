@@ -140,7 +140,7 @@ A relayed frame grows by **5 bytes for the first relay** (4 for the tuple, 1 for
 | Bits (31 first) | Field | Size | Values |
 |---|---|---|---|
 | 31-29 | role | 3 | see below |
-| 28-24 | model decoded | 5 | the newest model the station decodes; 0 = plain only |
+| 28-24 | model decoded | 5 | 0 = the station decodes plain content only; otherwise the newest model it decodes **plus one** (model 0, the first set, is sent as 1), so that 0 is not mistaken for the first model |
 | 23-21 | SF | 3 | 0 to 7 = SF5 to SF12 |
 | 20-19 | BW | 2 | 62.5 / 125 / 250 / 500 kHz |
 | 18-17 | CR | 2 | 4/5, 4/6, 4/7, 4/8 |

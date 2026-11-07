@@ -119,7 +119,7 @@ cap_y = add_y + 112
 text(30, cap_y, "Capability bytes (4 bytes after V, only when V bit 7 is set; 32 bits, bit 31 first, sent about every 8th beacon):", 13, "bold")
 cx = 30
 CU = 31
-for lbl, n_, note in [("role", 3, ["transmit only,", "listens, digi,", "late tiers, iGate"]), ("model", 5, ["newest model", "the station", "decodes"]), ("SF", 3, ["SF5 to", "SF12"]), ("BW", 2, ["62.5 to", "500 kHz"]),
+for lbl, n_, note in [("role", 3, ["transmit only,", "listens, digi,", "late tiers, iGate"]), ("model", 5, ["0 plain only,", "else newest", "model + 1"]), ("SF", 3, ["SF5 to", "SF12"]), ("BW", 2, ["62.5 to", "500 kHz"]),
                       ("CR", 2, ["4/5 to", "4/8"]), ("power", 6, ["dBm exactly", "(0 unknown,", "1 to 63)"]), ("preset", 5, ["channel: 433.775,", "439.9125 (UK),", "434.855 (PL), ..."]), ("spare", 6, ["sent as 0"])]:
     w_ = CU * n_
     rect(cx, cap_y + 10, w_, 34, C["vlc"]); text(cx + w_ / 2, cap_y + 32, "%s %d" % (lbl, n_), 12, "bold", anchor="middle")

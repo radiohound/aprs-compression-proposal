@@ -627,7 +627,7 @@ size_t hb3_relay_passthrough(const uint8_t *fr, size_t n, const char *relay_call
     return relay_wide(fr, n, relay_call, tuple, out, cap, 1);
 }
 
-/* The capability bytes (spec 12): role 3 | model decoded 5 | SF 3 | BW 2 | CR 2 | power 6 | preset 5 | spare 6, 32 bits, most significant byte first. power = dBm (0 unknown, 1 to 63). */
+/* The capability bytes (spec 12): role 3 | model decoded 5 (0 = plain only, else the newest model plus one) | SF 3 | BW 2 | CR 2 | power 6 | preset 5 | spare 6, 32 bits, most significant byte first. power = dBm (0 unknown, 1 to 63). */
 static const int cap_bits[7] = { 3, 5, 3, 2, 2, 6, 5 };
 int hb3_cap_pack(const int f[7], uint8_t out[4])
 {
