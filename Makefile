@@ -84,7 +84,13 @@ build/hb3_test: tools/hb3/hb3.c tools/hb3/hb3.h tools/hb/hbi.c tools/hb/hbc.c to
 	$(CC) $(CFLAGS) -Itools/hb3 -c tools/hb3/hb3.c -o build/hb3.o
 	$(CC) $(CFLAGS) -Itools/hb3 tools/hb3/hb3_test.c build/hb3.o build/hbi.o build/hbc.o -o $@
 
-hb3-test: build/hb3_test
+build/hb3_edge_test: tools/hb3/hb3.c tools/hb3/hb3.h tools/hb3/hb3_edge_test.c build/hb3_test
+	$(CC) $(CFLAGS) -Itools/hb3 tools/hb3/hb3_edge_test.c build/hb3.o build/hbi.o build/hbc.o -o $@
+
+hb3-edge: build/hb3_edge_test
+	build/hb3_edge_test
+
+hb3-test: build/hb3_test hb3-edge
 	build/hb3_test check test/vectors_hb3_v1.txt
 	build/hb3_test relaycheck test/vectors_hb3_relay_v1.txt
 	build/hb3_test relaycheck test/vectors_hb3_relay_chain_v1.txt

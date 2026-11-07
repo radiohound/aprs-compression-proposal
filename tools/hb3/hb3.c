@@ -469,8 +469,7 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_
     else { if (end < b + 4) return HB3_ERR_CONTENT; L = fr[b]; if (L < 1) return HB3_ERR_CONTENT; want = (uint16_t)(fr[b + 1] | fr[b + 2] << 8); bodyp = fr + b + 3; bn = end - b - 3; hasL = 1; }
     /* the CRC is over the bytes as sent: it needs no model, so a relay without the model checks it too */
     if (crc_wire(hdr, V, hascap ? capb : NULL, fr + 4, path_start - 4, fr + front_len, cs - front_len, hasL, (uint8_t)L, bodyp, bn) != want) return HB3_ERR_CRC;
-    if (structural) infof[0] = 0;
-    else if (cc == 3) {                                                    /* plain content uses no model: the model bits are ignored */
+    if (cc == 3) {                                                         /* plain content uses no model: the model bits are ignored, so a relay without the model checks it like any receiver */
         size_t tl = bn;
         if (tl > 255) return HB3_ERR_CONTENT;
         if (memchr(bodyp, 0, tl)) return HB3_ERR_CONTENT;                 /* strict: no NUL in a TNC2 packet */
@@ -485,7 +484,12 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_
             if (alt.present) strcat(infof, alt.text);
             { size_t cur = strlen(infof); memcpy(infof + cur, comment + off, tl - off); infof[cur + tl - off] = 0; }
         }
+        if (structural) infof[0] = 0;                                      /* the front only: the information field is not given */
         if (info) { info->cc = 1; info->payload_len = 0; }
+    } else if (structural) {                                               /* LACF content without the model: the two rules that need only L and the payload length */
+        if (4 + bn >= 3 + L) return HB3_ERR_SIZE;
+        if (kind == 3 && alt.present && alt.offset > L) return HB3_ERR_POSITION;
+        infof[0] = 0;
     } else {
         size_t pn = bn; int ok;
         if (ver != MODEL_VERSION) return HB3_ERR_VERSION;                  /* LACF content needs the model */
@@ -527,9 +531,13 @@ static size_t relay_core(const uint8_t *fr, size_t n, const hb3_info_t *in, cons
     size_t i = 4, cs, end = n, w = 0, wr, pb = 0, from, fw = 4, base; int k, q, relay_idx = -1, own, np = t2->np; uint8_t hdr = fr[3]; char own_el[48]; hb3_rxt_t rx;
     uint8_t front[300];
     snprintf(own_el, sizeof own_el, "%s*", relay_call);
-    for (k = 0; k < np; k++) if (!strcmp(t2->path[k], own_el)) { relay_idx = k; break; }
+    for (k = 0; k < np; k++) {
+        if (!wide_compliant(t2->path[k])) return 0;                         /* a non-compliant WIDE path is not sent in any form, whoever chose it */
+        if (!strcmp(t2->path[k], own_el)) { if (relay_idx >= 0) return 0; relay_idx = k; }   /* our call used twice: the frame has already been through this relay, and a digipeater does not repeat what it repeated */
+    }
     if (relay_idx < 0) return 0;
-    own = relay_idx <= 6;                                                   /* mask bits 0 to 6 only: an eighth element or later relays without its own tuple */
+    own = relay_idx <= 6;
+    if (own) for (q = 0; q < 4; q++) if (tuple[q] >= 0x80) return 0;        /* a tuple byte of 0x80 or more would look like the mask marker: the frame would be dropped by every receiver */                                                   /* mask bits 0 to 6 only: an eighth element or later relays without its own tuple */
     /* locate the parts to copy: re-walk the received front */
     { char e[40]; size_t j = 4;
       if (!dec_element(fr, n, &j, e, sizeof e)) return 0;
@@ -546,6 +554,7 @@ static size_t relay_core(const uint8_t *fr, size_t n, const hb3_info_t *in, cons
         if (oj >= relay_idx || oj >= t->np) return 0;                       /* a tuple on the relay's own element or a later one: not relayed (spec 11, Relay, step 3) */
         if (oj < np && !strcmp(t2->path[oj], t->path[oj])) m = oj;
         else { for (m = 0; m < relay_idx; m++) if (!strcmp(t2->path[m], t->path[oj])) break; if (m == relay_idx) continue; }   /* the element is gone: its tuple goes with it */
+        if (m > 6) continue;                                                /* the mask has bits 0 to 6 only: a tuple whose element moved to the eighth place or later cannot be carried */
         pos = rx.n; while (pos > 0 && rx.idx[pos - 1] > m) pos--;
         if (pos > 0 && rx.idx[pos - 1] == m) continue;
         for (x = rx.n; x > pos; x--) { rx.idx[x] = rx.idx[x - 1]; memcpy(rx.t[x], rx.t[x - 1], 4); }

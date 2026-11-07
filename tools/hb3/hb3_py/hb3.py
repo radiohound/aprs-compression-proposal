@@ -441,6 +441,8 @@ def _parse(frame):
     f = bytes(frame)
     if len(f) < 5 or f[:3] != b'\x3c\xff\x03':
         raise Drop('not_native')
+    if len(f) > 255:
+        raise Drop('too_long')                        # a LoRa frame holds 255 bytes
     h = f[3]
     kind = h & 3
     npath = h >> 4
@@ -564,10 +566,23 @@ def _check_crc(d, f, V, cap, L, crc, body):
 
 
 def verify(frame):
-    """What a relay without the model can check: the structure (the same as for any receiver) and the CRC over the bytes as sent. Raises Drop."""
+    """What a relay without the model can check: everything a receiver checks that does not need the model. The structure, the CRC over the bytes as sent, and
+    the content rules that need no model: plain content is read like any receiver reads it (no model is involved), and LACF content is held to the size rule and
+    the altitude offset (they need only L and the length of the payload). A frame a full receiver would drop for any other reason than a model or a destination
+    code it does not hold is therefore not forwarded. Raises Drop."""
     d = _parse(frame)
     V, cap, L, crc, body = _wire(d, d['frame'])
     _check_crc(d, d['frame'], V, cap, L, crc, body)
+    if d['plain']:
+        if len(body) > 255 or b'\x00' in body:
+            raise Drop('nul' if b'\x00' in body else 'too_long')
+        if d['kind'] & 1 and d['alt_off'] is not None and d['alt_off'] > len(body):
+            raise Drop('bad_altitude_offset')
+    else:
+        if not 4 + len(body) < 3 + L:
+            raise Drop('should_be_raw')
+        if d['kind'] == 3 and d['alt_off'] is not None and d['alt_off'] > L:
+            raise Drop('bad_altitude_offset')
     return d
 
 

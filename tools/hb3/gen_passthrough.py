@@ -28,4 +28,28 @@ for k, f in enumerate(frames):
         d = H._parse(f); b = bytearray(f); b[d['content_end'] - 1] ^= 0x04
         assert H.relay_passthrough(bytes(b)) is None and H.relay(bytes(b)) is None
         out.append('%s - -' % bytes(b).hex())
+# Frames a full receiver drops for a content rule that needs no model: the relay without the model drops them too ('- -').
+def with_crc(f, L, body):
+    """The frame f with a new L (None for plain content) and body, and the CRC recomputed over the bytes as sent."""
+    d = H._parse(f); p = d['cstart']; V = f[p]; q = p + 1; cap = b''
+    if V & 0x80: cap = f[q:q + 4]; q += 4
+    crc = H.crc_wire(d['header'], V, cap, f[4:d['path_start']], f[d['pos_start']:d['pos_end']], L, body)
+    return f[:q] + (bytes([L]) if L is not None else b'') + bytes([crc & 255, crc >> 8]) + body
+n_nul = n_size = 0
+for k, f in enumerate(frames):
+    if f is None: continue
+    try: d = H._parse(f)
+    except H.Drop: continue
+    V = f[d['cstart']]
+    if d['tuples'] or H.relay_passthrough(f) is None: continue
+    body = f[d['cstart'] + 1 + (4 if V & 0x80 else 0) + (2 if d['plain'] else 3):d['content_end']]
+    L = None if d['plain'] else f[d['cstart'] + 1 + (4 if V & 0x80 else 0)]
+    if d['plain'] and n_nul < 3:
+        bad = with_crc(f, None, body + b'\x00'); n_nul += 1
+        assert H.relay_passthrough(bad) is None and H.relay(bad) is None
+        out.append('%s - -' % bad.hex())
+    if (not d['plain']) and n_size < 3 and L and L >= 2:
+        bad = with_crc(f, len(body), body); n_size += 1       # L no longer larger than the payload allows: the size rule (LACF must be smaller than plain)
+        assert H.relay_passthrough(bad) is None
+        out.append('%s - -' % bad.hex())
 sys.stdout.write('\n'.join(out) + '\n')
