@@ -176,9 +176,11 @@ static unsigned num(const char *s, int n) { unsigned v = 0; int k; for (k = 0; k
 /* Parse the information field into a position block and the comment that remains; returns the block length (> 0) or 0. */
 static size_t pos_encode(const char *info, size_t len, uint8_t *blk, char *comment, size_t *clen)
 {
-    size_t i = 1, w = 1; uint8_t flags = 0; const char *p; const char *dti = strchr(DTIS, info[0]);
+    size_t i = 1, w = 1; uint8_t flags = 0; const char *p; const char *dti;
     uint8_t tmp[32]; size_t tw = 0;
-    if (len < 2 || !dti || info[0] == 0) return 0;
+    if (len < 2) return 0;                                             /* before info[0] is read: the caller's buffer need not end with a NUL */
+    dti = strchr(DTIS, info[0]);
+    if (!dti || info[0] == 0) return 0;
     flags = (uint8_t)(dti - DTIS);
     if (info[0] == '/' || info[0] == '@') {
         uint32_t v; const char *f;
@@ -426,6 +428,7 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_
     char src[40], dest[40], path[15][40], prefix[96], comment[300], text[300], infof[700]; alt_t alt; hb3_rxt_t rx; int cc, ver, hascap, hasL = 0; uint8_t V, capb[CAPLEN] = {0, 0, 0, 0}; size_t b, bn, L = 0; const uint8_t *bodyp; uint16_t want;
     memset(&rx, 0, sizeof rx); alt.present = 0; prefix[0] = 0;
     if (n < 6 || fr[0] != 0x3C || fr[1] != 0xFF || fr[2] != 0x03) return HB3_ERR_PREFIX;
+    if (n > 255) return HB3_ERR_SIZE;                                        /* a LoRa frame is at most 255 bytes; also keeps crc_wire inside its buffer (it returns 0 beyond it) */
     hdr = fr[3]; kind = hdr & 3; npath = hdr >> 4;
     if (hdr & 0x04) return HB3_ERR_RESERVED;                                 /* kinds 0 and 1 are plain content, 2 and 3 LACF content; kinds 1 and 3 have a position block */
     if (!dec_element(fr, n, &i, src, sizeof src)) return HB3_ERR_FRONT;
@@ -504,8 +507,8 @@ static int decode_impl(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_
     }
     { size_t w; int q;
       w = (size_t)snprintf(tnc2, cap, "%s>%s", src, dest);
-      for (q = 0; q < npath; q++) w += (size_t)snprintf(tnc2 + w, cap - w, ",%s", path[q]);
-      w += (size_t)snprintf(tnc2 + w, cap - w, ":%s", infof);
+      for (q = 0; q < npath && w < cap; q++) w += (size_t)snprintf(tnc2 + w, cap - w, ",%s", path[q]);   /* cap - w must not wrap: stop as soon as the text no longer fits */
+      if (w < cap) w += (size_t)snprintf(tnc2 + w, cap - w, ":%s", infof);
       if (w >= cap) return HB3_ERR_CONTENT;
       if (info) { info->kind = kind; info->ver = ver; info->npath = npath; info->frame_len = n; info->content_len = end - cs; info->front_len = front_len; info->path_start = path_start; info->content_start = cs; info->has_rxt = have_rxt; info->rxt = rx; info->has_cap = hascap; memcpy(info->cap, capb, CAPLEN); }
       return (int)w; }
