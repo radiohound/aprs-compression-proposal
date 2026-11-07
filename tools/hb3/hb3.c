@@ -599,6 +599,23 @@ static size_t relay_wide(const uint8_t *fr, size_t n, const char *relay_call, co
     return relay_core(fr, n, &in, &t, &t2, relay_call, tuple, out, cap);
 }
 
+/* The front of a frame, whatever its model: the structural checks and the CRC (over the bytes as sent), no content decode. text gets "src>dest,path:" (the destination is "?" when its code
+ * is not assigned in this list); a digipeater that does not hold the frame's model can apply its own path rule to it. Returns the text length, or a negative HB3_ERR_*. */
+int hb3_decode_front(const uint8_t *fr, size_t n, char *text, size_t cap, hb3_info_t *info)
+{
+    return decode_impl(fr, n, text, cap, info, 1);
+}
+
+/* "Relay without the model" with the path chosen by the caller (the digipeater's own rule, applied to the text hb3_decode_front gave): new_tnc2 is that text with the new path, holding
+ * relay_call + "*" as the element the relay used. Only the source and the destination must be those of the received frame; the content is not known. Same copy rules as hb3_relay_to. */
+size_t hb3_relay_to_passthrough(const uint8_t *fr, size_t n, const char *new_tnc2, size_t new_len, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
+{
+    char tn[700]; hb3_info_t in; tnc_t t, t2; int len = decode_impl(fr, n, tn, sizeof tn, &in, 1);
+    if (len <= 0 || !tnc_parse(tn, (size_t)len, &t) || !tnc_parse(new_tnc2, new_len, &t2)) return 0;
+    if (strcmp(t.src, t2.src) || strcmp(t.dest, t2.dest)) return 0;                 /* only the path may differ */
+    return relay_core(fr, n, &in, &t, &t2, relay_call, tuple, out, cap);
+}
+
 size_t hb3_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap)
 {
     return relay_wide(fr, n, relay_call, tuple, out, cap, 0);

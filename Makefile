@@ -94,6 +94,7 @@ hb3-test: build/hb3_test
 	build/hb3_test relaytocheck test/vectors_hb3_relay_edge_v1.txt
 	build/hb3_test capcheck test/vectors_hb3_cap_v1.txt
 	build/hb3_test passcheck test/vectors_hb3_passthrough_v1.txt
+	build/hb3_test passtopathcheck test/vectors_hb3_passthrough_v1.txt
 	@n=$$(grep -v '^#' test/vectors_hb3_reject_v1.txt | awk '{print $$1}' | build/hb3_test recv | grep -vc '^-$$'); echo "rejection vectors: $$n accepted (must be 0)"; test "$$n" = 0
 	python3 tools/hb/gen_packets.py 3000 > build/hb_packets.txt
 	build/hb3_test props build/hb_packets.txt

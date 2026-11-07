@@ -43,6 +43,10 @@ size_t hb3_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint
 /* "Relay without the model": the same, but the frame need not be accepted by hb3_decode: only the structural checks are made (no model, no content CRC), so a frame whose
  * model or destination code the relay does not hold is forwarded, content field byte for byte. The relay must not show, upload or use such a frame. */
 size_t hb3_relay_passthrough(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
+/* The front of a frame whatever its model (structure and CRC, no content decode): text = "src>dest,path:", so a digipeater can apply its own path rule; see hb3_relay_to_passthrough. */
+int hb3_decode_front(const uint8_t *fr, size_t n, char *text, size_t cap, hb3_info_t *info);
+/* Relay without the model with the path chosen by the caller (new_tnc2 = the text of hb3_decode_front with the digipeater's new path). Only the source and the destination must match. */
+size_t hb3_relay_to_passthrough(const uint8_t *fr, size_t n, const char *new_tnc2, size_t new_len, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
 
 /* The same relay with the new path chosen by the caller, for a digipeater with its own rules: new_tnc2 is the received packet with the path as the relay sends it (it
  * holds relay_call + "*" as the element the relay used); source, destination and information field must be those of the received frame. Copies the source and the

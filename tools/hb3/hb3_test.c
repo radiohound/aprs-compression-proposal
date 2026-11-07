@@ -8,6 +8,7 @@
  *   hb3_test relaygen  < packets.txt     for each packet with an unused WIDE1-1 or WIDE2-2: "<frame hex> <relayed frame hex> <relayed tnc2 hex>"
  *   hb3_test capcheck FILE               "<frame hex> <tnc2 hex> <capability hex>": encode with the four capability bytes, decode, and the bytes read back
  *   hb3_test passcheck FILE              "<received hex> <pass-through relayed hex or -> <normal relay hex or ->": first-hop relay N0RLY-1; the pass-through relay and the relay that decodes
+ *   hb3_test passtopathcheck FILE       the same file through hb3_relay_to_passthrough: the new path is taken from the relayed frame's own front, so it must give the same bytes
  *   hb3_test props packets.txt           cuts, appended bytes, bit flips, RXT, relay: what is accepted that should not be
  *   hb3_test time packets.txt            encode and decode time on this machine */
 #include "hb3.h"
@@ -183,6 +184,24 @@ int main(int argc, char **argv)
         }
         fclose(f);
         printf("%d pass-through vectors, %d failed\n", cnt, bad);
+        return bad != 0;
+    }
+    if (!strcmp(argv[1], "passtopathcheck") && argc > 2) {
+        FILE *f = fopen(argv[2], "r"); char l[3000]; int cnt = 0, bad = 0;
+        if (!f) { perror(argv[2]); return 2; }
+        while (fgets(l, sizeof l, f)) {
+            char *a, *b; uint8_t rx[400], pw[400], o[400]; size_t rl, pl = 0, w; char front[700]; int fl;
+            if (l[0] == '#' || l[0] == '\n') continue;
+            a = strchr(l, ' '); if (!a) continue; *a++ = 0; b = strchr(a, ' '); if (!b) continue; *b++ = 0;
+            if (a[0] == '-') continue;                                            /* a frame no relay may forward */
+            rl = unhex(l, rx, sizeof rx); pl = unhex(a, pw, sizeof pw); cnt++;
+            fl = hb3_decode_front(pw, pl, front, sizeof front, NULL);          /* the relayed frame's own front: source, destination and the new path */
+            if (fl <= 0) { bad++; printf("path vector %d: the relayed frame has no front\n", cnt); continue; }
+            w = hb3_relay_to_passthrough(rx, rl, front, (size_t)fl, "N0RLY-1", TUP, o, sizeof o);
+            if (w != pl || memcmp(o, pw, pl)) { bad++; printf("path vector %d: mismatch\n", cnt); }
+        }
+        fclose(f);
+        printf("%d pass-through vectors with the caller's path, %d failed\n", cnt, bad);
         return bad != 0;
     }
     if (!strcmp(argv[1], "props") && argc > 2) {
