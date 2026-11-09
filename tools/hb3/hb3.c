@@ -11,7 +11,7 @@ size_t hbc_payload_encode(const uint8_t *text, size_t tl, uint8_t *out, size_t c
 int    hbc_payload_check(const uint8_t *pay, size_t n, size_t L, uint8_t *text);
 
 #define MODEL_VERSION 0                     /* model version 0: the two PPM tables above (the destination list is not versioned: fixed, append-only codes) */
-#define VBYTE(has_cap) ((uint8_t)(((has_cap) ? 0x80 : 0) | MODEL_VERSION))   /* 3.0.0-dev.1 (proposal): V = c ss mmmmm, c = three capability bytes follow V, ss two spare bits (0), mmmmm the model version */
+#define VBYTE(has_cap) ((uint8_t)(((has_cap) ? 0x80 : 0) | MODEL_VERSION))   /* 3.0.0-dev.1 (proposal): V = c ss mmmmm, c = four capability bytes follow V, ss two spare bits (0), mmmmm the model version */
 #define MAX_LIST 126                        /* destination codes 0 to 125; 126 is reserved and 127 is the escape */
 static char list[MAX_LIST][12]; static int nlist = 0;
 

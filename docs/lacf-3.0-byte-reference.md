@@ -71,11 +71,11 @@ In every form `s` is the used mark: `s = 1` means the element had a `*` (the pac
 
 ### 4.2 The destination byte
 
-The destination is one byte, `c iiiiiii` (3.0.0-dev.1; in 2.0.0 it was `ff iiiiii` with 62 ranked codes):
+The destination is one byte, `r iiiiiii` (3.0.0-dev.1; in 2.0.0 it was `ff iiiiii` with 62 ranked codes):
 
 | Bits | Name | What it does |
 |---|---|---|
-| 7 | `c`, reserved | a sender sets it to 0 and a receiver ignores it, so a later version can give it a meaning; a relay copies it unchanged |
+| 7 | `r`, reserved (not `c`: that is the capability flag in `V`) | a sender sets it to 0 and a receiver ignores it, so a later version can give it a meaning; a relay copies it unchanged |
 | 6-0 | `iiiiiii`, the code | 0 to 125 name destinations (device or software ids) of the destination list; 126 is reserved (dropped); 127 is the escape: an address element follows (so 6 bytes in all) |
 
 The codes are fixed and append-only: a code never changes meaning, and the list is not versioned in `V`. A receiver drops a frame whose code is not assigned in its own list (a relay may still forward it). Code 0 is `APLRG1` (the LoRa APRS iGate), so the byte `00` means `APLRG1`. A destination that is not in the list is sent as `7F` followed by an address element. A receiver also accepts the escape form for a destination that is in the list.
@@ -169,16 +169,16 @@ Four bytes after `V`, one 32-bit number, most significant byte first. They descr
 
 | Bits (31 first) | Field | Values |
 |---|---|---|
-| 31-29 | role | 0 transmit only, 1 listens, 2 digipeater, 3 digipeater late, 4 iGate (no RF relay), 5 iGate and digipeater, 6 iGate and digipeater late, 7 reserved |
+| 31-29 | role | 0 transmit only, 1 listens, 2 digipeater, 3 reserved (was digipeater late; not sent until a late relay's behaviour is specified), 4 reserved or to be redefined (was iGate, no RF relay: a receive-only station never transmits this block), 5 iGate and digipeater, 6 reserved (was iGate and digipeater late), 7 reserved |
 | 28-24 | model decoded | 0 = plain content only; otherwise the newest model the station decodes plus one (model 0 is sent as 1) |
 | 23-21 | SF | 0 to 7 = SF5 to SF12 |
 | 20-19 | BW | 62.5 / 125 / 250 / 500 kHz |
 | 18-17 | CR | 4/5, 4/6, 4/7, 4/8 |
 | 16-11 | power | the radio's configured output in whole dBm: 0 = unknown, 1 to 63 = that many dBm (10, 12, 20, 22, 30, 33, 37 and 40 dBm are exact); the module's output, not the power radiated |
-| 10-6 | preset | 0 the channel it was heard on, 1 = 144.390 MHz AFSK, 2 = 433.775 MHz, 3 = 439.9125 MHz (UK), 4 = 434.855 MHz (Poland), 5 to 29 and 30, 31 reserved |
+| 10-6 | frequency ID | 0 the channel it was heard on, 1 reserved (was 144.390 MHz AFSK, removed), 2 = 433.775 MHz, 3 = 439.9125 MHz, 4 = 434.855 MHz, 5 to 29 and 30, 31 reserved; renumbering (0 = not announced, then 1, 2, 3) is for the next dev tag |
 | 5-0 | spare | a sender sets 0, a receiver ignores them |
 
-Six bits are spare. The bytes are advisory: a receiver ignores a value it does not know and never drops a frame for it, but drops a frame with `c` set and fewer than four bytes after `V`. Sent about every 8th transmission (at most hourly, at least every 6 hours), at start-up and when settings change.
+SF, BW, CR and the frequency ID are the receive profile; power is the configured transmit power. Six bits are spare. The bytes are advisory: a receiver ignores a value it does not know and never drops a frame for it, but drops a frame with `c` set and fewer than four bytes after `V`. Sent about every 8th transmission (at most hourly, at least every 6 hours), at start-up and when settings change.
 
 ## 7. RXT block (added by relays)
 

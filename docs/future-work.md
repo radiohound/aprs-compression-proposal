@@ -37,3 +37,9 @@ This is a question for CA2RXU before it is a plan: it affects his project and hi
 * The model version field has room (32 models); a firmware may hold more than one model.
 * The type byte is the generation, so a library or a split firmware can carry both decoders.
 * A relay without the model works on a frame it cannot decode, so a device that has not received a new model yet can still pass the frame on.
+
+## 4. A crossband bridge announcement
+
+**The idea.** A gateway that brings VHF AFSK packets (for example from 144.390 MHz) onto LoRa could announce that it does. This is not a frequency ID: the frequency ID and the SF, BW and CR fields describe a station's LoRa receive profile (F4MLV, 9 November 2026), and AFSK has none of them. It would be a separate item, for example a flag in the spare capability bits, with its own definition: the direction, the band, and what happens to the original packet's signal data. A crossband relay writes 93 (not measured) for what it cannot measure on the VHF hop.
+
+**Where it stands.** Not part of the proposal and not decided. 144.390 MHz was removed from the frequency IDs.

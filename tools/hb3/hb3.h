@@ -40,7 +40,7 @@ int hb3_decode(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_info_t *
 /* Relay (spec 11 "Relay"): the frame must already be accepted by hb3_decode. Rewrites the path (WIDE1-1 as first unused hop becomes relay_call*; WIDE2-2 becomes
  * relay_call*,WIDE2-1), copies the position block and the content field byte for byte, and appends the relay's tuple. Returns the new length, or 0. */
 size_t hb3_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
-/* "Relay without the model": the same, but the frame need not be accepted by hb3_decode: only the structural checks are made (no model, no content CRC), so a frame whose
+/* "Relay without the model": the same, but the frame need not be accepted by hb3_decode: the structural checks, the CRC over the bytes as sent and the content rules that need no model are made (no model decode), so a frame whose
  * model or destination code the relay does not hold is forwarded, content field byte for byte. The relay must not show, upload or use such a frame. */
 size_t hb3_relay_passthrough(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
 /* The front of a frame whatever its model (structure and CRC, no content decode): text = "src>dest,path:", so a digipeater can apply its own path rule; see hb3_relay_to_passthrough. */
