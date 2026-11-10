@@ -1,5 +1,7 @@
 # LACF byte and bit reference
 
+> **Historical (9 November 2026): this is the reference for LACF 2.0.0, which is retired as a type `3C FF 02` format** (type 02 returns to F4MLV's native draft 0). The successor is the proposal in [lacf-3.0-byte-reference.md](lacf-3.0-byte-reference.md).
+
 What every byte and bit in the [frame picture](lacf-frame-layout.md) means and what it does. LACF (LoRa APRS Compact Frame, [spec 11](../spec/11-native-ppm-frame-byte-plan.md)) is a draft in early development and still being reviewed for change, so a value here can change. The spec is the authority; where this sheet and the spec differ, the spec wins. The bytes of the examples come from the reference code (`tools/hb`).
 
 **Notation.** Bits are numbered 7 (the most significant) down to 0. Bytes are written in hex (`3C`). `0b` marks binary. "Big endian" means the most significant byte is sent first; the CRC is the one field sent low byte first. A receiver that meets a value marked "dropped" throws the whole frame away and never shows it as text.

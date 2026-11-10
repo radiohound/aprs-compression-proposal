@@ -1,5 +1,7 @@
 # APRS-PPM: LoRa APRS packets about 40% smaller
 
+> **LACF 2.0.0 is historical (9 November 2026).** It was an RF-tested experiment and is retired as a type `3C FF 02` format: F4MLV asked that type 02 stay his native draft 0 (the format Jon, N7UV, stayed with), and K6ATV agrees. Its spec, codec and tag `v2.0.0` stay as the record; the successor is the proposal in [spec 12](spec/12-lacf-3.0-dev-byte-plan.md) (type `3C FF 03`). The firmware page below is switched off.
+
 > **LACF 2.0.0 (2 November 2026): protocol version 2. It is not compatible with the earlier test builds (1 and 2 November).**
 > Plain-form frames now carry a CRC-16 (a plain frame cut before transmission used to be accepted as different text), the
 > plain or LACF form is in the header kind bits, and the version byte `V` is now the protocol version (5 bits) and the table
@@ -192,6 +194,7 @@ one would be welcome. They are not part of the Direwolf LoRa driver pull request
 * [LACF: airtime saved and processor time](docs/hybrid-savings-and-timing.md): measured on 14,305 real packets and on an ESP32, with the relayed-traffic effect
 * [Questions and answers](docs/faq.md): does it still work on normal LoRa APRS, what reaches APRS-IS, what a stock iGate does
 * [How it works, in plain language](docs/how-it-works.md) and [why not 438 or an off-the-shelf compressor](docs/alternatives-considered.md)
+* [Possible later steps around 3.0.0](docs/future-work.md): firmware segmentation for over-the-air updates, a library for LACF, where the firmware work lives (ideas only)
 * [The over-the-air test log](docs/over-the-air-test.md), with a section updated as the long run continues
 * [Everything else: all specs, simulation tables, roadmap, VHF notes](DETAILS.md)
 
