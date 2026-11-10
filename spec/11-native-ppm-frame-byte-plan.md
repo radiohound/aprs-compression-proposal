@@ -1,5 +1,7 @@
 # LACF, the LoRa APRS Compact Frame: native frame with a PPM-coded content field (spec 11, byte plan)
 
+> **HISTORICAL (9 November 2026): LACF 2.0.0 is retired as a type 02 format.** It was an RF-tested experiment (1 and 2 November 2026). F4MLV asked, in his review of PR #3, that `3C FF 02` stay assigned to his native draft 0, the format Jon (N7UV) stayed with, and K6ATV agrees. This document, its codec (`tools/hb`), vectors and tag `v2.0.0` stay as the record. The successor is LACF 3 ([spec 12](12-lacf-3.0-dev-byte-plan.md), type `3C FF 03`, a proposal that needs F4MLV's agreement). No firmware should read type 02 as LACF 2.0.0 outside an explicit test, and the public LACF firmware page is switched off.
+>
 > **DRAFT, WORK IN PROGRESS.** Not a standard; in early development and still being reviewed for change. It is implemented in the C reference, an independent Python implementation, the iGate, the T-Deck tracker and Dire Wolf (test branches), and was tried on the air on 1 November 2026 between a LoRa32, a T-Deck and a hill Pi; no released firmware has it. Details will change; do not build deployed software from this text. Where it is weak or undecided is listed under "Open" and "Not yet measured".
 >
 > *Last changed 2 November 2026. Version 2.0.0, see "Versions" below and `CHANGELOG.md`.*

@@ -1,5 +1,7 @@
 # APRS-PPM: LoRa APRS packets about 40% smaller
 
+> **LACF 2.0.0 is historical (9 November 2026).** It was an RF-tested experiment and is retired as a type `3C FF 02` format: F4MLV asked that type 02 stay his native draft 0 (the format Jon, N7UV, stayed with), and K6ATV agrees. Its spec, codec and tag `v2.0.0` stay as the record; the successor is the proposal in [spec 12](spec/12-lacf-3.0-dev-byte-plan.md) (type `3C FF 03`). The firmware page below is switched off.
+
 > **LACF 2.0.0 (2 November 2026): protocol version 2. It is not compatible with the earlier test builds (1 and 2 November).**
 > Plain-form frames now carry a CRC-16 (a plain frame cut before transmission used to be accepted as different text), the
 > plain or LACF form is in the header kind bits, and the version byte `V` is now the protocol version (5 bits) and the table
