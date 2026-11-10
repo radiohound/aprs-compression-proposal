@@ -118,7 +118,7 @@ Exact-entry coverage of the v2 list on the French capture (Ariège, 8,062 packet
 
     tuple 1 | tuple 2 | ... | tuple k | mask          the last byte of the frame is the mask
 
-* A tuple is 4 bytes: RSSI, SNR, frequency offset, time to hop, each the RXT character minus 33, so each byte is 0 to 89 for a measurement (his encoder clamps every field to 90 values; SNR has 89 steps, 0 to 88). Values above 89 are described under "Not measured and unknown values" below.
+* A tuple is 4 bytes: RSSI, SNR, frequency offset, time to hop, each the RXT character minus 33, so a measurement is 0 to 89 for RSSI, frequency offset and time to hop and 0 to 88 for SNR, which has 89 steps (his encoder clamps every field to 90 values). *Proposed, to resolve what F4MLV asked on 9 November 2026: SNR value 89 is not a measurement.* Values above 89 are described under "Not measured and unknown values" below.
 * The mask has **bit 7 set** as a marker. Bit j (0 to 6) set means that path element j (0 is the first element after the destination) carries a measurement. Tuples are in ascending order of j. `k` is the number of mask bits 0 to 6 that are set.
 * The block is `4k + 1` bytes. Bits at or above the path element count are not allowed. **A tuple byte of 0x80 or more is impossible** (it would look like a mask marker), and a receiver drops a frame that has one; a byte from 90 to 127 is *unknown* for its field and the frame is kept (3.0.0-dev.1, below). *In 2.0.0 a receiver dropped a frame with any tuple byte above its field's maximum (RSSI 89, SNR 88, frequency offset 89, time to hop 89), a check that random damage fails about 98% of the time; the proposal gives it up because RXT is advisory, and the LoRa CRC and the mask marker already protect it.*
 
@@ -265,7 +265,7 @@ The two edge vectors at the end of [`test/vectors_hb3_relay_edge_v1.txt`](../tes
 
 Mic-E is not decoded or converted by this plan. A Mic-E packet is carried as received: the destination as the escape plus the 5-byte element (6 bytes, since its characters are the position), and the information field as plain content (kind 0), or as a LACF content field (kind 2) only if that is shorter, which is unusual because the field is printable binary. Relays forward it exactly as above. Converting Mic-E to a native position
 would save only 1 to 3 bytes per Mic-E packet, almost all of it in the destination, and would change the bytes of the packet; it is not worth that and is not part of this plan.
-If the sender used the destination SSID as a path code, the relay applies the usual rule to it.
+LACF stations use an explicit path: a path code in the destination SSID (the old Mic-E convention) is not used, so no relay applies a path rule to the destination SSID (F4MLV, 9 November 2026).
 
 ## Conformance (draft)
 
@@ -538,7 +538,7 @@ His tracker (`moricef/LoRa_APRS_Tracker`, branch `devel`, `src/lora_utils.cpp` a
 * **RXT at the end.** K6ATV's choice: one rule for every frame (a relay appends without moving bytes, and RXT is never inside the content). His current firmware puts the block after the path, so this needs F4MLV's agreement and a matching change in his firmware; frames from his current builds would not interoperate for RXT. Also **seven path elements instead of eight**, because of the marker bit.
 * **Jon N7UV's view** on anything that changes what the tuple carries (the plan keeps the four measurements unchanged), and **F6BVP's** on identification: hybrid B keeps the source callsign recoverable in every frame, as F4MLV prefers.
 * **`V` costs one byte per frame** (the model version, the capability flag and two spare bits; in 2.0.0 the protocol and table versions).
-* **Mic-E** is forwarded unchanged (decided: not worth converting). Open: whether the destination-SSID path rule applies to a Mic-E destination.
+* **Mic-E** is forwarded unchanged (decided: not worth converting). The destination SSID is not a path code in LACF (see Relay, step 1).
 * **The relay procedure** above is a draft: path rewriting in native elements (the index of the relay's element, moving mask bits when elements change), and time to hop at transmit time, need F4MLV's firmware to confirm.
 
 ## History

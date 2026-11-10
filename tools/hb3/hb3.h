@@ -1,5 +1,5 @@
-/* Reference implementation of the frame of spec 11 (hybrid B): 3C FF 03 | header | source | destination | path... | [position block] | content field | [RXT block].
- * Kinds 2 and 3 only (a frame of kind 0 or 1 is dropped). Written from spec/11. */
+/* Reference implementation of LACF 3.0.0-dev.1 (spec 12): 3C FF 03 | header | source | destination | path... | [position block] | content field | [RXT block].
+ * Kinds 0 to 3: plain or LACF content, with or without a position block. Written from spec/12. */
 #ifndef HB3_H
 #define HB3_H
 #include <stddef.h>
@@ -37,7 +37,7 @@ int  hb3_path_ok(const char *tnc2, size_t len);
 /* Receiver (spec 11 "Receiver"): returns the TNC2 length (> 0) or a negative HB3_ERR_* (the frame is dropped). */
 int hb3_decode(const uint8_t *fr, size_t n, char *tnc2, size_t cap, hb3_info_t *info);
 
-/* Relay (spec 11 "Relay"): the frame must already be accepted by hb3_decode. Rewrites the path (WIDE1-1 as first unused hop becomes relay_call*; WIDE2-2 becomes
+/* Relay (spec 12 "Relay"): the frame must already be accepted by hb3_decode. Rewrites the path (WIDE1-1 as first unused hop becomes relay_call*; WIDE2-2 becomes
  * relay_call*,WIDE2-1), copies the position block and the content field byte for byte, and appends the relay's tuple. Returns the new length, or 0. */
 size_t hb3_relay(const uint8_t *fr, size_t n, const char *relay_call, const uint8_t tuple[4], uint8_t *out, size_t cap);
 /* "Relay without the model": the same, but the frame need not be accepted by hb3_decode: the structural checks, the CRC over the bytes as sent and the content rules that need no model are made (no model decode), so a frame whose
